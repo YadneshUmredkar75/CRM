@@ -1,9 +1,11 @@
-// server.js or index.js
+// server.js
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
 import connectDB from "./config/db.js";
-import Counter from "./models/counter.js"; // ← Must import
+import Counter from "./models/counter.js";
 
 // Routes
 import adminRoutes from "./routes/adminRoutes.js";
@@ -20,10 +22,14 @@ import leaveRoutes from "./routes/leaveRoutes.js";
 
 dotenv.config();
 
-// CONNECT DB FIRST
+// Required for ESM directory path
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Connect DB
 connectDB();
 
-// INITIALIZE COUNTER AFTER DB IS CONNECTED
+// Counter Initialize
 const initCounter = async () => {
   try {
     const counter = await Counter.findOne({ _id: "client_project_number" });
@@ -31,28 +37,36 @@ const initCounter = async () => {
       await Counter.create({ _id: "client_project_number", seq: 1000 });
       console.log("Counter initialized → Next project: PROJ-000001");
     } else {
-      console.log(`Counter exists → Next project: PROJ-${String(counter.seq + 1).padStart(6, "0")}`);
+      console.log(
+        `Counter exists → Next project: PROJ-${String(counter.seq + 1).padStart(6, "0")}`
+      );
     }
   } catch (err) {
     console.error("Failed to initialize counter:", err);
   }
 };
 
-initCounter(); // ← Now safe to call
+initCounter();
 
 const app = express();
 
-const corsOptions = {
-  origin: "http://localhost:5173",
-  credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-};
+// ---------------- CORS FIX FOR DEPLOYMENT ----------------
+app.use(
+  cors({
+    origin: [
+      "http://localhost:5173",
+      "https://crm-khaki-eight.vercel.app" // ← frontend URL
+    ],
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
+// ---------------------------------------------------------
 
-app.use(cors(corsOptions));
 app.use(express.json());
 
-// Routes
+// API Routes
 app.use("/api/admin", adminRoutes);
 app.use("/api/employee", employeeRoutes);
 app.use("/api/lead", leadRoutes);
@@ -65,6 +79,11 @@ app.use("/api/projects", projectRoutes);
 app.use("/api/students", studentRoutes);
 app.use("/api/leaves", leaveRoutes);
 
+// Serve Test Route
+app.get("/", (req, res) => {
+  res.send("CRM Backend is running 🚀");
+});
+
 // Global Error Handler
 app.use((err, req, res, next) => {
   console.error("Global Error:", err);
@@ -74,7 +93,8 @@ app.use((err, req, res, next) => {
   });
 });
 
+// Server Port
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`Backend running on port: ${PORT}`);
 });
