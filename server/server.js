@@ -55,7 +55,7 @@ app.use(
   cors({
     origin: [
       "http://localhost:5173",
-      "https://crm-khaki-eight.vercel.app", // deployed frontend
+      "https://crm-seven-jade.vercel.app/", // deployed frontend
     ],
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
