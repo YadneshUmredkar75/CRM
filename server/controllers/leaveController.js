@@ -1,5 +1,5 @@
 // src/controllers/leaveController.js
-import Leave from "../models/Leave.js";
+import Leave from "../models/leave.js";
 import Employee from "../models/employeeModel.js";
 
 // Helper: Async wrapper
