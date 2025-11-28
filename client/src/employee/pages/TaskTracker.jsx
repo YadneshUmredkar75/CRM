@@ -6,7 +6,7 @@ import TaskCard from "../components/TaskCard";
 import { toast, Toaster } from "react-hot-toast";
 
 const IST = "Asia/Kolkata";
-const API_URL = "http://localhost:5000/api";
+const API_URL = "https://crm-c1y4.onrender.com/api";
 
 const PRIORITY_OPTIONS = [
   { label: "Low", value: "low" },

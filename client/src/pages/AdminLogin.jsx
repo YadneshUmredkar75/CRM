@@ -22,7 +22,7 @@ const AdminLogin = () => {
     }
 
     try {
-      // Vite proxy → /api/admin/login → http://localhost:5000/api/admin/login
+      // Vite proxy → /api/admin/login → https://crm-c1y4.onrender.com/api/admin/login
       const res = await fetch("/api/admin/login", {
         method: "POST",
         headers: {

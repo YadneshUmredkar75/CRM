@@ -27,7 +27,7 @@ const EmployeeAttendance = () => {
     if (!token) return;
     setLoading(true);
     try {
-      const res = await fetch("http://localhost:5000/api/attendance/history", {
+      const res = await fetch("https://crm-c1y4.onrender.com/api/attendance/history", {
         headers: { Authorization: `Bearer ${token}` },
       });
       const result = await res.json();
@@ -67,7 +67,7 @@ const handleClockIn = async () => {
 
     const { latitude, longitude } = position.coords;
 
-    const res = await fetch("http://localhost:5000/api/attendance/clock-in", {
+    const res = await fetch("https://crm-c1y4.onrender.com/api/attendance/clock-in", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -96,7 +96,7 @@ const handleClockIn = async () => {
   const handleClockOut = async () => {
     setClocking("out");
     try {
-      const res = await fetch("http://localhost:5000/api/attendance/clock-out", {
+      const res = await fetch("https://crm-c1y4.onrender.com/api/attendance/clock-out", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

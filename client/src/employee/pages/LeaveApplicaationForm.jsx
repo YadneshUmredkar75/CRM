@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { toast, Toaster } from 'react-hot-toast';
 
-const API_BASE = 'http://localhost:5000/api/leaves';
+const API_BASE = 'https://crm-c1y4.onrender.com/api/leaves';
 
 export default function LeaveApplicationForm() {
   const [formData, setFormData] = useState({
