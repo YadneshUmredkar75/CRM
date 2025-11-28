@@ -124,9 +124,6 @@ studentSchema.pre('save', function (next) {
     next();
 });
 
-// Add index for better performance
-courseSchema.index({ instructor: 1 });
-courseSchema.index({ status: 1 });
-courseSchema.index({ startDate: 1 });
+
 
 export default mongoose.model('Course', courseSchema);

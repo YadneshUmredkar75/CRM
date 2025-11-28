@@ -119,12 +119,7 @@ const clientSchema = new Schema(
 );
 
 // Indexes for performance
-clientSchema.index({ email: 1 });        // already unique
-clientSchema.index({ projects: 1 });     // for fast lookup by project number
-clientSchema.index({ status: 1 });
-clientSchema.index({ industry: 1 });
-clientSchema.index({ value: -1 });       // for sorting by highest value
-clientSchema.index({ lastContact: -1 }); // for "recently contacted"
+
 
 // Virtual: Format project number with prefix (e.g., PROJ-000123)
 clientSchema.virtual("projectId").get(function () {

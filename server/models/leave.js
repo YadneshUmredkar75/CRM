@@ -34,9 +34,6 @@ const leaveSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Index for fast queries
-leaveSchema.index({ employee: 1 });
-leaveSchema.index({ status: 1 });
-leaveSchema.index({ startDate: -1 });
+
 
 export default mongoose.model("Leave", leaveSchema);

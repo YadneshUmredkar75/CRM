@@ -56,11 +56,7 @@ const taskSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Index for better query performance
-taskSchema.index({ employeeId: 1 });
-taskSchema.index({ status: 1 });
-taskSchema.index({ dueDate: 1 });
-taskSchema.index({ employeeId: 1, status: 1 });
+
 
 // Method to check if task is completed
 taskSchema.methods.isCompleted = function() {

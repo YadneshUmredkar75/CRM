@@ -134,12 +134,7 @@ leadSchema.virtual("details").get(function () {
   return `${this.companyName || "N/A"} - ${this.jobRole || "N/A"}`;
 });
 
-// Indexes for Performance
-leadSchema.index({ broughtBy: 1, status: 1 });
-leadSchema.index({ status: 1 });
-leadSchema.index({ leadType: 1 });
-leadSchema.index({ createdAt: -1 });
-leadSchema.index({ followUpDate: 1 });
+
 
 // Pre-save hook: Set convertedAt / lostAt
 leadSchema.pre("save", function (next) {

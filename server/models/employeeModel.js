@@ -28,9 +28,6 @@ employeeSchema.virtual("totalSalary").get(function() {
 });
 
 // Index for better query performance
-employeeSchema.index({ email: 1 });
-employeeSchema.index({ loginId: 1 });
-employeeSchema.index({ department: 1 });
-employeeSchema.index({ status: 1 });
+
 
 export default mongoose.model("Employee", employeeSchema);
