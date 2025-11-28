@@ -5,7 +5,7 @@ import {
   CheckCircle, XCircle, Clock, Search, Users, Calendar, Trash2, AlertCircle, RefreshCw, UserCheck, UserX
 } from 'lucide-react';
 
-const API_BASE = 'https://crm-c1y4.onrender.com/leaves';
+const API_BASE = 'https://crm-c1y4.onrender.com/apileaves';
 
 const formatDate = (dateStr) => {
   if (!dateStr) return '—';
