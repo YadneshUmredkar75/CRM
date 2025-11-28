@@ -42,7 +42,7 @@ useEffect(() => {
     }
 
     try {
-      const res = await fetch("/api/employee/login", {
+      const res = await fetch("https://crm-c1y4.onrender.com/employee/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ identifier, password }),
