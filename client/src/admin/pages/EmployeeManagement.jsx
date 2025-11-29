@@ -120,6 +120,7 @@ const EmployeeManagement = () => {
   const API_URL = "https://crm-c1y4.onrender.com/api/";
   const token = localStorage.getItem("adminToken");
 
+  
   // Redirect if not logged in
   useEffect(() => {
     if (!token) {
