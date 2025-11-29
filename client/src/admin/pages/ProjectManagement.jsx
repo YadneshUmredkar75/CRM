@@ -4,7 +4,7 @@ import toast, { Toaster } from "react-hot-toast";
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: "https://crm-c1y4.onrender.com",
+  baseURL: "https://crm-c1y4.onrender.com/api", // ADDED /api HERE
 });
 
 // Add token to every request
@@ -91,15 +91,16 @@ const ProjectManagement = () => {
     const loadData = async () => {
       try {
         const [projRes, clientRes, empRes] = await Promise.all([
-          api.get("/projects"),
-          api.get("/clients"),
-          api.get("/employee/get/employee"),
+          api.get("/projects"), // Now resolves to /api/projects
+          api.get("/clients"), // Now resolves to /api/clients
+          api.get("/employee/get/employee"), // Now resolves to /api/employee/get/employee
         ]);
 
         setProjects(projRes.data.projects || []);
         setClients(clientRes.data.clients || []);
         setEmployees(empRes.data.employees || []);
       } catch (err) {
+        console.error("Load data error:", err);
         toast.error("Failed to load data");
       } finally {
         setLoading(false);
@@ -137,6 +138,7 @@ const ProjectManagement = () => {
         budget: "", status: "Planning", priority: "Medium", teamMembers: [], progress: 0
       });
     } catch (err) {
+      console.error("Submit error:", err);
       toast.error(err.response?.data?.message || "Operation failed");
     }
   };
@@ -148,6 +150,7 @@ const ProjectManagement = () => {
       setProjects((prev) => prev.filter((p) => p._id !== id));
       toast.success("Project deleted");
     } catch (err) {
+      console.error("Delete error:", err);
       toast.error("Delete failed");
     }
   };
@@ -266,12 +269,11 @@ const ProjectManagement = () => {
                       </td>
                       <td className="px-6 py-4 font-bold text-green-600">₹{Number(p.budget).toLocaleString()}</td>
                       <td className="px-6 py-4">
-                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                          p.status === "Completed" ? "bg-green-100 text-green-800" :
-                          p.status === "In Progress" ? "bg-blue-100 text-blue-800" :
-                          p.status === "Planning" ? "bg-yellow-100 text-yellow-800" :
-                          "bg-red-100 text-red-800"
-                        }`}>
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${p.status === "Completed" ? "bg-green-100 text-green-800" :
+                            p.status === "In Progress" ? "bg-blue-100 text-blue-800" :
+                              p.status === "Planning" ? "bg-yellow-100 text-yellow-800" :
+                                "bg-red-100 text-red-800"
+                          }`}>
                           {p.status}
                         </span>
                       </td>
