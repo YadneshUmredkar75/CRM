@@ -120,7 +120,6 @@ const EmployeeManagement = () => {
   const API_URL = "https://crm-c1y4.onrender.com/api";
   const token = localStorage.getItem("adminToken");
 
-
   // Redirect if not logged in
   useEffect(() => {
     if (!token) {
@@ -134,25 +133,39 @@ const EmployeeManagement = () => {
     if (!employeeId) return { tasks: [], completedTasks: 0, totalTasks: 0 };
 
     try {
-      const response = await fetch(`${API_URL}/admin/tasks/${employeeId}`);
+      const response = await fetch(`${API_URL}/admin/tasks/${employeeId}`, {
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        }
+      });
       if (response.ok) {
         const data = await response.json();
         const tasks = Array.isArray(data) ? data : data.tasks || [];
         const completedTasks = tasks.filter(t => t.status === 'Completed' || t.status === 'completed').length;
         return { tasks, completedTasks, totalTasks: tasks.length };
       }
-    } catch (err) { console.error("Admin tasks error:", err); }
+    } catch (err) {
+      console.error("Admin tasks error:", err);
+    }
 
     // Fallback
     try {
-      const empResponse = await fetch(`${API_URL}/employee/${employeeId}/tasks`);
+      const empResponse = await fetch(`${API_URL}/employee/${employeeId}/tasks`, {
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        }
+      });
       if (empResponse.ok) {
         const empData = await empResponse.json();
         const tasks = Array.isArray(empData) ? empData : empData.tasks || [];
         const completedTasks = tasks.filter(t => t.status === 'Completed' || t.status === 'completed').length;
         return { tasks, completedTasks, totalTasks: tasks.length };
       }
-    } catch (err) { console.error("Fallback tasks error:", err); }
+    } catch (err) {
+      console.error("Fallback tasks error:", err);
+    }
 
     return { tasks: [], completedTasks: 0, totalTasks: 0 };
   };
@@ -162,7 +175,12 @@ const EmployeeManagement = () => {
     if (!employeeId) return { attendance: [], attendanceRate: 0, presentDays: 0, totalDays: 0 };
 
     try {
-      const response = await fetch(`${API_URL}/attendance/${employeeId}/attendance`);
+      const response = await fetch(`${API_URL}/attendance/${employeeId}/attendance`, {
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        }
+      });
       if (response.ok) {
         const data = await response.json();
         const records = Array.isArray(data) ? data : data.attendance || [];
@@ -171,11 +189,18 @@ const EmployeeManagement = () => {
         const attendanceRate = totalDays > 0 ? Math.round((presentDays / totalDays) * 100) : 0;
         return { attendance: records, attendanceRate, presentDays, totalDays };
       }
-    } catch (err) { console.error("Admin attendance error:", err); }
+    } catch (err) {
+      console.error("Admin attendance error:", err);
+    }
 
     // Fallback
     try {
-      const empResponse = await fetch(`${API_URL}/attendance/admin/employee/${employeeId}/attendance`);
+      const empResponse = await fetch(`${API_URL}/attendance/admin/employee/${employeeId}/attendance`, {
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        }
+      });
       if (empResponse.ok) {
         const empData = await empResponse.json();
         const records = Array.isArray(empData) ? empData : empData.attendance || [];
@@ -184,7 +209,9 @@ const EmployeeManagement = () => {
         const attendanceRate = totalDays > 0 ? Math.round((presentDays / totalDays) * 100) : 0;
         return { attendance: records, attendanceRate, presentDays, totalDays };
       }
-    } catch (err) { console.error("Fallback attendance error:", err); }
+    } catch (err) {
+      console.error("Fallback attendance error:", err);
+    }
 
     return { attendance: [], attendanceRate: 0, presentDays: 0, totalDays: 0 };
   };
@@ -192,12 +219,19 @@ const EmployeeManagement = () => {
   // === Fetch Performance (with fallback) ===
   const fetchEmployeePerformance = async (employeeId) => {
     try {
-      const response = await fetch(`${API_URL}/employee/${employeeId}/performance`);
+      const response = await fetch(`${API_URL}/employee/${employeeId}/performance`, {
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        }
+      });
       if (response.ok) {
         const data = await response.json();
         return { performance: data.performance || 0 };
       }
-    } catch (err) { console.log("Performance endpoint not available"); }
+    } catch (err) {
+      console.log("Performance endpoint not available");
+    }
 
     const [tasksData, attendanceData] = await Promise.all([
       fetchEmployeeTasksData(employeeId),
@@ -210,7 +244,7 @@ const EmployeeManagement = () => {
     return { performance };
   };
 
-  // === Fetch All Employees + Tasks + Attendance + Performance ===
+  // === FIXED: Fetch All Employees + Tasks + Attendance + Performance ===
   const fetchEmployees = async () => {
     if (!token) return setError("Token missing");
 
@@ -218,7 +252,13 @@ const EmployeeManagement = () => {
     setError("");
 
     try {
-      const response = await fetch(`${API_URL}employee/get/employee`,);
+      // FIXED: Added forward slash before employee
+      const response = await fetch(`${API_URL}/employee/get/employee`, {
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        }
+      });
 
       if (!response.ok) {
         if (response.status === 401) {
@@ -260,17 +300,23 @@ const EmployeeManagement = () => {
 
       setEmployees(employeesWithData);
     } catch (err) {
-      setError("Failed to load employees. Server down?");
+      if (err.message.includes("404")) {
+        setError("Employees endpoint not found. Please check API configuration.");
+      } else {
+        setError("Failed to load employees. Server may be down.");
+      }
       setEmployees([]);
     } finally {
       setLoading(false);
     }
   };
-const calculateTaskCompletion = (tasks = []) => {
-  if (!tasks || tasks.length === 0) return 0;
-  const completed = tasks.filter((task) => task.status === "completed").length;
-  return Math.round((completed / tasks.length) * 100);
-};
+
+  const calculateTaskCompletion = (tasks = []) => {
+    if (!tasks || tasks.length === 0) return 0;
+    const completed = tasks.filter((task) => task.status === "completed").length;
+    return Math.round((completed / tasks.length) * 100);
+  };
+
   // Modal Fetchers
   const fetchEmployeeTasks = async (employeeId) => {
     const data = await fetchEmployeeTasksData(employeeId);
@@ -290,7 +336,12 @@ const calculateTaskCompletion = (tasks = []) => {
 
   // === Handlers ===
   const openResetPasswordModal = (emp) => {
-    setResetPasswordData({ employeeId: emp._id, employeeName: emp.name, newPassword: "", confirmPassword: "" });
+    setResetPasswordData({
+      employeeId: emp._id,
+      employeeName: emp.name,
+      newPassword: "",
+      confirmPassword: ""
+    });
     setIsResetPasswordModalOpen(true);
   };
 
@@ -308,38 +359,58 @@ const calculateTaskCompletion = (tasks = []) => {
 
   const handleResetPassword = async (e) => {
     e.preventDefault();
-    if (resetPasswordData.newPassword !== resetPasswordData.confirmPassword) return alert("Passwords don't match");
-    if (resetPasswordData.newPassword.length < 6) return alert("Password too short");
+    if (resetPasswordData.newPassword !== resetPasswordData.confirmPassword) {
+      alert("Passwords don't match");
+      return;
+    }
+    if (resetPasswordData.newPassword.length < 6) {
+      alert("Password must be at least 6 characters long");
+      return;
+    }
 
     try {
       const res = await fetch(`${API_URL}/employee/${resetPasswordData.employeeId}/reset-password`, {
         method: "POST",
-        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
         body: JSON.stringify({ newPassword: resetPasswordData.newPassword })
       });
 
       if (res.ok) {
         const emp = employees.find(e => e._id === resetPasswordData.employeeId);
-        setNewEmployeeCredentials({ name: emp.name, email: emp.email, loginId: emp.loginId, password: resetPasswordData.newPassword });
+        setNewEmployeeCredentials({
+          name: emp.name,
+          email: emp.email,
+          loginId: emp.loginId,
+          password: resetPasswordData.newPassword
+        });
         setIsResetPasswordModalOpen(false);
         setIsCredentialsModalOpen(true);
-        setSuccess("Password reset!");
+        setSuccess("Password reset successfully!");
       } else {
-        alert("Reset failed");
+        alert("Password reset failed");
       }
     } catch (err) {
-      alert("Network error");
+      alert("Network error occurred");
     }
   };
 
   const handlePaySalary = async (e) => {
     e.preventDefault();
-    if (!paySalaryData.amount || paySalaryData.amount <= 0) return alert("Invalid amount");
+    if (!paySalaryData.amount || paySalaryData.amount <= 0) {
+      alert("Please enter a valid amount");
+      return;
+    }
 
     try {
       const res = await fetch(`${API_URL}/salary/pay/${paySalaryData.employeeId}`, {
         method: "POST",
-        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
         body: JSON.stringify({
           amount: parseFloat(paySalaryData.amount),
           month: paySalaryData.month,
@@ -351,42 +422,63 @@ const calculateTaskCompletion = (tasks = []) => {
       if (res.ok) {
         setIsPaySalaryModalOpen(false);
         fetchEmployees();
-        setSuccess("Salary paid!");
+        setSuccess("Salary paid successfully!");
       } else {
-        alert("Payment failed");
+        alert("Salary payment failed");
       }
     } catch (err) {
-      alert("Network error");
+      alert("Network error occurred");
     }
   };
 
   const handleAdd = async (e) => {
     e.preventDefault();
     const required = ["name", "email", "department", "position", "salary", "joiningDate", "loginId", "password"];
-    if (required.some(f => !newEmployee[f])) return alert("Fill all required fields");
-    if (newEmployee.password.length < 6) return alert("Password too short");
+    if (required.some(f => !newEmployee[f])) {
+      alert("Please fill all required fields");
+      return;
+    }
+    if (newEmployee.password.length < 6) {
+      alert("Password must be at least 6 characters long");
+      return;
+    }
 
-    const payload = { ...newEmployee, salary: +newEmployee.salary, department: +newEmployee.department };
+    const payload = {
+      ...newEmployee,
+      salary: +newEmployee.salary,
+      department: +newEmployee.department
+    };
 
     try {
       const res = await fetch(`${API_URL}/employee/create/employee`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
         body: JSON.stringify(payload)
       });
 
       if (res.ok) {
-        setNewEmployeeCredentials({ name: payload.name, email: payload.email, loginId: payload.loginId, password: payload.password });
+        setNewEmployeeCredentials({
+          name: payload.name,
+          email: payload.email,
+          loginId: payload.loginId,
+          password: payload.password
+        });
         setIsCredentialsModalOpen(true);
         setIsAddModalOpen(false);
         fetchEmployees();
-        setSuccess("Employee created!");
-        setNewEmployee({ name: "", email: "", phone: "", department: "", position: "", salary: "", joiningDate: "", employeeType: "Employee", loginId: "", password: "" });
+        setSuccess("Employee created successfully!");
+        setNewEmployee({
+          name: "", email: "", phone: "", department: "", position: "", salary: "",
+          joiningDate: "", employeeType: "Employee", loginId: "", password: ""
+        });
       } else {
-        alert("Failed to create");
+        alert("Failed to create employee");
       }
     } catch (err) {
-      alert("Network error");
+      alert("Network error occurred");
     }
   };
 
@@ -394,13 +486,22 @@ const calculateTaskCompletion = (tasks = []) => {
     e.preventDefault();
     if (!selectedEmployee) return;
 
-    const payload = { ...selectedEmployee, salary: +selectedEmployee.salary, department: +selectedEmployee.department };
-    delete payload.tasks; delete payload.attendance; delete payload.performance;
+    const payload = {
+      ...selectedEmployee,
+      salary: +selectedEmployee.salary,
+      department: +selectedEmployee.department
+    };
+    delete payload.tasks;
+    delete payload.attendance;
+    delete payload.performance;
 
     try {
       const res = await fetch(`${API_URL}/employee/update/${selectedEmployee._id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
         body: JSON.stringify(payload)
       });
 
@@ -408,17 +509,17 @@ const calculateTaskCompletion = (tasks = []) => {
         fetchEmployees();
         setIsEditModalOpen(false);
         setSelectedEmployee(null);
-        setSuccess("Updated!");
+        setSuccess("Employee updated successfully!");
       } else {
         alert("Update failed");
       }
     } catch (err) {
-      alert("Network error");
+      alert("Network error occurred");
     }
   };
 
   const handleDelete = async (id) => {
-    if (!confirm("Delete this employee?")) return;
+    if (!confirm("Are you sure you want to delete this employee?")) return;
     try {
       const res = await fetch(`${API_URL}/employee/delete/${id}`, {
         method: "DELETE",
@@ -426,18 +527,18 @@ const calculateTaskCompletion = (tasks = []) => {
       });
       if (res.ok) {
         fetchEmployees();
-        setSuccess("Deleted!");
+        setSuccess("Employee deleted successfully!");
       } else {
         alert("Delete failed");
       }
     } catch (err) {
-      alert("Network error");
+      alert("Network error occurred");
     }
   };
 
   const copyCredentialsToClipboard = () => {
     const text = `Name: ${newEmployeeCredentials.name}\nEmail: ${newEmployeeCredentials.email}\nLogin ID: ${newEmployeeCredentials.loginId}\nPassword: ${newEmployeeCredentials.password}`;
-    navigator.clipboard.writeText(text).then(() => alert("Copied!"));
+    navigator.clipboard.writeText(text).then(() => alert("Credentials copied to clipboard!"));
   };
 
   // === Filter & Sort ===
@@ -469,7 +570,7 @@ const calculateTaskCompletion = (tasks = []) => {
 
   const getPerformanceColor = (p) => p >= 90 ? "text-green-600 bg-green-50 border-green-200" :
     p >= 80 ? "text-blue-600 bg-blue-50 border-blue-200" :
-    p >= 70 ? "text-yellow-600 bg-yellow-50 border-yellow-200" : "text-red-600 bg-red-50 border-red-200";
+      p >= 70 ? "text-yellow-600 bg-yellow-50 border-yellow-200" : "text-red-600 bg-red-50 border-red-200";
 
   const totalEmployees = employees.length;
   const activeEmployees = employees.filter(e => e.status === "Active").length;
@@ -487,7 +588,11 @@ const calculateTaskCompletion = (tasks = []) => {
   }, [success]);
 
   if (!token) {
-    return <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">Redirecting...</div>;
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        Redirecting...
+      </div>
+    );
   }
 
   return (
@@ -504,7 +609,7 @@ const calculateTaskCompletion = (tasks = []) => {
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4">
             <div className="flex justify-between items-center">
               <span>{error}</span>
-              <button 
+              <button
                 onClick={() => setError("")}
                 className="text-red-700 hover:text-red-900"
               >
@@ -566,7 +671,10 @@ const calculateTaskCompletion = (tasks = []) => {
                 </select>
                 <div className="relative">
                   <input
-                    type="text" placeholder="Search..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
+                    type="text"
+                    placeholder="Search..."
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
                     className="pl-8 pr-3 py-1.5 text-sm border rounded-md w-full md:w-48"
                   />
                   <SearchIcon className="w-4 h-4 absolute left-2 top-2 text-gray-400" />
@@ -574,7 +682,7 @@ const calculateTaskCompletion = (tasks = []) => {
                 <button onClick={() => setIsAddModalOpen(true)} className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded-md text-sm flex items-center gap-1">
                   <UserIcon className="w-4 h-4" /> Add
                 </button>
-                <button 
+                <button
                   onClick={fetchEmployees}
                   className="bg-green-500 hover:bg-green-600 text-white px-3 py-1.5 rounded-md text-sm flex items-center gap-1"
                 >
@@ -606,8 +714,6 @@ const calculateTaskCompletion = (tasks = []) => {
               <table className="w-full min-w-[1100px]">
                 <thead className="bg-gray-50 text-xs">
                   <tr>
-                    {/* <th className="px-3 py-2 text-left">Rank</th> */}
-                    {/* <th className="px-6 py-2 text-left">Status</th>  */}
                     <th className="px-4 py-2 text-left">Employee</th>
                     <th className="px-3 py-2 text-left">Login ID</th>
                     <th className="px-3 py-2 text-left">Dept & Role</th>
@@ -626,22 +732,9 @@ const calculateTaskCompletion = (tasks = []) => {
                     const totalTasks = emp.totalTasks || 0;
                     const completedTasks = emp.completedTasks || 0;
                     const taskCompletion = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-                    
+
                     return (
                       <tr key={emp._id} className="hover:bg-gray-50">
-                        {/* <td className="px-3 py-3 text-center"> */}
-                          {/* <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-bold border ${getRankColor(emp.rank)}`}>
-                            #{emp.rank}
-                          </div> */}
-                        {/* </td> */}
-                        {/* <td className="px-3 py-3 text-center">
-                          <div className="flex items-center justify-center gap-1">
-                            <LiveStatusIcon isActive={emp.statusDisplay} />
-                            <span className={`text-xs font-medium ${emp.isActive ? 'text-green-700' : 'text-red-700'}`}>
-                              {emp.isActive ? "Active" : "Deactive"}
-                            </span>
-                          </div>
-                        </td> */}
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
                             <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xs font-bold">
@@ -679,8 +772,8 @@ const calculateTaskCompletion = (tasks = []) => {
                         <td className="px-3 py-3 text-center text-xs">
                           {completedTasks}/{totalTasks}
                           <div className="w-full bg-gray-200 rounded-full h-1.5 mt-1">
-                            <div 
-                              className="bg-blue-600 h-1.5 rounded-full" 
+                            <div
+                              className="bg-blue-600 h-1.5 rounded-full"
                               style={{ width: `${taskCompletion}%` }}
                             ></div>
                           </div>
@@ -693,12 +786,6 @@ const calculateTaskCompletion = (tasks = []) => {
                             <button onClick={() => { setSelectedEmployee(emp); setIsEditModalOpen(true); }} className="p-1.5 text-yellow-600 hover:bg-yellow-50 rounded" title="Edit">
                               <EditIcon className="w-4 h-4" />
                             </button>
-                            {/* <button onClick={() => fetchEmployeeTasks(emp._id)} className="p-1.5 text-purple-600 hover:bg-purple-50 rounded" title="View Tasks">
-                              <TaskIcon className="w-4 h-4" />
-                            </button> */}
-                            {/* <button onClick={() => fetchEmployeeAttendance(emp._id)} className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded" title="View Attendance"> */}
-                              {/* <AttendanceIcon className="w-4 h-4" />
-                            </button> */}
                             <button onClick={() => openResetPasswordModal(emp)} className="p-1.5 text-green-600 hover:bg-green-50 rounded" title="Reset Password">
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
@@ -759,8 +846,8 @@ const calculateTaskCompletion = (tasks = []) => {
             <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
               <div className="flex justify-between items-center mb-5">
                 <h3 className="text-xl font-bold">Reset Password</h3>
-                <button onClick={() => { 
-                  setIsResetPasswordModalOpen(false); 
+                <button onClick={() => {
+                  setIsResetPasswordModalOpen(false);
                   setResetPasswordData({
                     employeeId: "",
                     employeeName: "",
@@ -771,7 +858,7 @@ const calculateTaskCompletion = (tasks = []) => {
                   <CloseIcon />
                 </button>
               </div>
-              
+
               <div className="mb-4 p-3 bg-blue-50 rounded-lg">
                 <p className="text-sm text-blue-800">
                   Reset password for: <strong>{resetPasswordData.employeeName}</strong>
@@ -815,12 +902,12 @@ const calculateTaskCompletion = (tasks = []) => {
                   />
                 </div>
 
-                {resetPasswordData.newPassword && resetPasswordData.confirmPassword && 
-                 resetPasswordData.newPassword !== resetPasswordData.confirmPassword && (
-                  <div className="text-red-600 text-sm">
-                    Passwords do not match
-                  </div>
-                )}
+                {resetPasswordData.newPassword && resetPasswordData.confirmPassword &&
+                  resetPasswordData.newPassword !== resetPasswordData.confirmPassword && (
+                    <div className="text-red-600 text-sm">
+                      Passwords do not match
+                    </div>
+                  )}
 
                 {resetPasswordData.newPassword && resetPasswordData.newPassword.length < 6 && (
                   <div className="text-red-600 text-sm">
@@ -829,27 +916,27 @@ const calculateTaskCompletion = (tasks = []) => {
                 )}
 
                 <div className="flex justify-end gap-3 pt-4">
-                  <button 
-                    type="button" 
-                    onClick={() => { 
-                      setIsResetPasswordModalOpen(false); 
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsResetPasswordModalOpen(false);
                       setResetPasswordData({
                         employeeId: "",
                         employeeName: "",
                         newPassword: "",
                         confirmPassword: ""
                       });
-                    }} 
+                    }}
                     className="px-5 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-md text-sm"
                   >
                     Cancel
                   </button>
-                  <button 
-                    type="submit" 
-                    disabled={!resetPasswordData.newPassword || 
-                             !resetPasswordData.confirmPassword || 
-                             resetPasswordData.newPassword !== resetPasswordData.confirmPassword ||
-                             resetPasswordData.newPassword.length < 6}
+                  <button
+                    type="submit"
+                    disabled={!resetPasswordData.newPassword ||
+                      !resetPasswordData.confirmPassword ||
+                      resetPasswordData.newPassword !== resetPasswordData.confirmPassword ||
+                      resetPasswordData.newPassword.length < 6}
                     className="px-5 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-md text-sm disabled:bg-gray-400 disabled:cursor-not-allowed"
                   >
                     Reset Password
@@ -866,8 +953,8 @@ const calculateTaskCompletion = (tasks = []) => {
             <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
               <div className="flex justify-between items-center mb-5">
                 <h3 className="text-xl font-bold">Pay Salary</h3>
-                <button onClick={() => { 
-                  setIsPaySalaryModalOpen(false); 
+                <button onClick={() => {
+                  setIsPaySalaryModalOpen(false);
                   setPaySalaryData({
                     employeeId: "",
                     employeeName: "",
@@ -880,7 +967,7 @@ const calculateTaskCompletion = (tasks = []) => {
                   <CloseIcon />
                 </button>
               </div>
-              
+
               <div className="mb-4 p-3 bg-blue-50 rounded-lg">
                 <p className="text-sm text-blue-800">
                   Pay salary for: <strong>{paySalaryData.employeeName}</strong>
@@ -920,8 +1007,8 @@ const calculateTaskCompletion = (tasks = []) => {
                       })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
-                      {Array.from({length: 12}, (_, i) => (
-                        <option key={i+1} value={i+1}>
+                      {Array.from({ length: 12 }, (_, i) => (
+                        <option key={i + 1} value={i + 1}>
                           {new Date(2024, i).toLocaleString('default', { month: 'long' })}
                         </option>
                       ))}
@@ -961,10 +1048,10 @@ const calculateTaskCompletion = (tasks = []) => {
                 </div>
 
                 <div className="flex justify-end gap-3 pt-4">
-                  <button 
-                    type="button" 
-                    onClick={() => { 
-                      setIsPaySalaryModalOpen(false); 
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsPaySalaryModalOpen(false);
                       setPaySalaryData({
                         employeeId: "",
                         employeeName: "",
@@ -973,13 +1060,13 @@ const calculateTaskCompletion = (tasks = []) => {
                         year: new Date().getFullYear(),
                         notes: ""
                       });
-                    }} 
+                    }}
                     className="px-5 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-md text-sm"
                   >
                     Cancel
                   </button>
-                  <button 
-                    type="submit" 
+                  <button
+                    type="submit"
                     disabled={!paySalaryData.amount || paySalaryData.amount <= 0}
                     className="px-5 py-2 bg-green-500 hover:bg-green-600 text-white rounded-md text-sm disabled:bg-gray-400 disabled:cursor-not-allowed"
                   >
@@ -1001,10 +1088,10 @@ const calculateTaskCompletion = (tasks = []) => {
                   <CloseIcon />
                 </button>
               </div>
-              
+
               <div className="mb-4 p-3 bg-blue-50 rounded-lg">
                 <p className="text-sm text-blue-800">
-                  Total Tasks: {employeeTasks.length} | Completed: {employeeTasks.filter(t => 
+                  Total Tasks: {employeeTasks.length} | Completed: {employeeTasks.filter(t =>
                     t.status === 'Completed' || t.status === 'completed'
                   ).length}
                 </p>
@@ -1030,16 +1117,15 @@ const calculateTaskCompletion = (tasks = []) => {
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                          (task.status === 'Completed' || task.status === 'completed') ? 'bg-green-100 text-green-800' : 
-                          task.status === 'In Progress' ? 'bg-yellow-100 text-yellow-800' : 
-                          'bg-red-100 text-red-800'
-                        }`}>
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${(task.status === 'Completed' || task.status === 'completed') ? 'bg-green-100 text-green-800' :
+                          task.status === 'In Progress' ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-red-100 text-red-800'
+                          }`}>
                           {task.status}
                         </span>
                         <div className="w-20 bg-gray-200 rounded-full h-2">
-                          <div 
-                            className="bg-blue-600 h-2 rounded-full" 
+                          <div
+                            className="bg-blue-600 h-2 rounded-full"
                             style={{ width: `${task.progress || 0}%` }}
                           ></div>
                         </div>
@@ -1063,10 +1149,10 @@ const calculateTaskCompletion = (tasks = []) => {
                   <CloseIcon />
                 </button>
               </div>
-              
+
               <div className="mb-4 p-3 bg-blue-50 rounded-lg">
                 <p className="text-sm text-blue-800">
-                  Total Records: {employeeAttendance.length} | Present Days: {employeeAttendance.filter(a => 
+                  Total Records: {employeeAttendance.length} | Present Days: {employeeAttendance.filter(a =>
                     a.status === 'Present' || a.status === 'present'
                   ).length}
                 </p>
@@ -1085,11 +1171,10 @@ const calculateTaskCompletion = (tasks = []) => {
                           <span className="font-semibold text-gray-800">
                             {new Date(record.date).toLocaleDateString()}
                           </span>
-                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                            (record.status === 'Present' || record.status === 'present') ? 'bg-green-100 text-green-800' : 
-                            record.status === 'Absent' ? 'bg-red-100 text-red-800' : 
-                            'bg-yellow-100 text-yellow-800'
-                          }`}>
+                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${(record.status === 'Present' || record.status === 'present') ? 'bg-green-100 text-green-800' :
+                            record.status === 'Absent' ? 'bg-red-100 text-red-800' :
+                              'bg-yellow-100 text-yellow-800'
+                            }`}>
                             {record.status}
                           </span>
                         </div>
@@ -1118,10 +1203,12 @@ const calculateTaskCompletion = (tasks = []) => {
             <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6">
               <div className="flex justify-between items-center mb-5">
                 <h3 className="text-xl font-bold">Add New Employee</h3>
-                <button onClick={() => { setIsAddModalOpen(false); setNewEmployee({
-                  name: "", email: "", phone: "", department: "", position: "", salary: "", 
-                  joiningDate: "", status: "Active", employeeType: "Employee", loginId: "", password: ""
-                }); }} className="text-gray-500 hover:text-gray-700">
+                <button onClick={() => {
+                  setIsAddModalOpen(false); setNewEmployee({
+                    name: "", email: "", phone: "", department: "", position: "", salary: "",
+                    joiningDate: "", status: "Active", employeeType: "Employee", loginId: "", password: ""
+                  });
+                }} className="text-gray-500 hover:text-gray-700">
                   <CloseIcon />
                 </button>
               </div>
@@ -1133,7 +1220,7 @@ const calculateTaskCompletion = (tasks = []) => {
                       type="text"
                       required
                       value={newEmployee.name}
-                      onChange={e => setNewEmployee({...newEmployee, name: e.target.value})}
+                      onChange={e => setNewEmployee({ ...newEmployee, name: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="Enter full name"
                     />
@@ -1144,7 +1231,7 @@ const calculateTaskCompletion = (tasks = []) => {
                       type="email"
                       required
                       value={newEmployee.email}
-                      onChange={e => setNewEmployee({...newEmployee, email: e.target.value})}
+                      onChange={e => setNewEmployee({ ...newEmployee, email: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="Enter email"
                     />
@@ -1154,7 +1241,7 @@ const calculateTaskCompletion = (tasks = []) => {
                     <input
                       type="tel"
                       value={newEmployee.phone}
-                      onChange={e => setNewEmployee({...newEmployee, phone: e.target.value})}
+                      onChange={e => setNewEmployee({ ...newEmployee, phone: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="Enter phone number"
                     />
@@ -1164,7 +1251,7 @@ const calculateTaskCompletion = (tasks = []) => {
                     <select
                       required
                       value={newEmployee.department}
-                      onChange={e => setNewEmployee({...newEmployee, department: e.target.value})}
+                      onChange={e => setNewEmployee({ ...newEmployee, department: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="">Select Department</option>
@@ -1179,7 +1266,7 @@ const calculateTaskCompletion = (tasks = []) => {
                       type="text"
                       required
                       value={newEmployee.position}
-                      onChange={e => setNewEmployee({...newEmployee, position: e.target.value})}
+                      onChange={e => setNewEmployee({ ...newEmployee, position: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="Enter position"
                     />
@@ -1191,7 +1278,7 @@ const calculateTaskCompletion = (tasks = []) => {
                       required
                       min="0"
                       value={newEmployee.salary}
-                      onChange={e => setNewEmployee({...newEmployee, salary: e.target.value})}
+                      onChange={e => setNewEmployee({ ...newEmployee, salary: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="Enter salary"
                     />
@@ -1202,7 +1289,7 @@ const calculateTaskCompletion = (tasks = []) => {
                       type="date"
                       required
                       value={newEmployee.joiningDate}
-                      onChange={e => setNewEmployee({...newEmployee, joiningDate: e.target.value})}
+                      onChange={e => setNewEmployee({ ...newEmployee, joiningDate: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
@@ -1210,7 +1297,7 @@ const calculateTaskCompletion = (tasks = []) => {
                     <label className="block text-sm font-medium text-gray-700 mb-1">Employee Type</label>
                     <select
                       value={newEmployee.employeeType}
-                      onChange={e => setNewEmployee({...newEmployee, employeeType: e.target.value})}
+                      onChange={e => setNewEmployee({ ...newEmployee, employeeType: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="Employee">Employee</option>
@@ -1221,7 +1308,7 @@ const calculateTaskCompletion = (tasks = []) => {
                     <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
                     <select
                       value={newEmployee.status}
-                      onChange={e => setNewEmployee({...newEmployee, status: e.target.value})}
+                      onChange={e => setNewEmployee({ ...newEmployee, status: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="Active">Active</option>
@@ -1234,7 +1321,7 @@ const calculateTaskCompletion = (tasks = []) => {
                       type="text"
                       required
                       value={newEmployee.loginId}
-                      onChange={e => setNewEmployee({...newEmployee, loginId: e.target.value})}
+                      onChange={e => setNewEmployee({ ...newEmployee, loginId: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="Enter login ID"
                     />
@@ -1246,17 +1333,19 @@ const calculateTaskCompletion = (tasks = []) => {
                       required
                       minLength="6"
                       value={newEmployee.password}
-                      onChange={e => setNewEmployee({...newEmployee, password: e.target.value})}
+                      onChange={e => setNewEmployee({ ...newEmployee, password: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="Enter password (min 6 characters)"
                     />
                   </div>
                 </div>
                 <div className="flex justify-end gap-3 pt-4">
-                  <button type="button" onClick={() => { setIsAddModalOpen(false); setNewEmployee({
-                    name: "", email: "", phone: "", department: "", position: "", salary: "", 
-                    joiningDate: "", status: "Active", employeeType: "Employee", loginId: "", password: ""
-                  }); }} className="px-5 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-md text-sm">
+                  <button type="button" onClick={() => {
+                    setIsAddModalOpen(false); setNewEmployee({
+                      name: "", email: "", phone: "", department: "", position: "", salary: "",
+                      joiningDate: "", status: "Active", employeeType: "Employee", loginId: "", password: ""
+                    });
+                  }} className="px-5 py-2 bg-gray-500 hover:bg-gray-600 text-white rounded-md text-sm">
                     Cancel
                   </button>
                   <button type="submit" className="px-5 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-md text-sm">
@@ -1286,7 +1375,7 @@ const calculateTaskCompletion = (tasks = []) => {
                       type="text"
                       required
                       value={selectedEmployee.name || ""}
-                      onChange={e => setSelectedEmployee({...selectedEmployee, name: e.target.value})}
+                      onChange={e => setSelectedEmployee({ ...selectedEmployee, name: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
@@ -1296,7 +1385,7 @@ const calculateTaskCompletion = (tasks = []) => {
                       type="email"
                       required
                       value={selectedEmployee.email || ""}
-                      onChange={e => setSelectedEmployee({...selectedEmployee, email: e.target.value})}
+                      onChange={e => setSelectedEmployee({ ...selectedEmployee, email: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
@@ -1305,7 +1394,7 @@ const calculateTaskCompletion = (tasks = []) => {
                     <input
                       type="tel"
                       value={selectedEmployee.phone || ""}
-                      onChange={e => setSelectedEmployee({...selectedEmployee, phone: e.target.value})}
+                      onChange={e => setSelectedEmployee({ ...selectedEmployee, phone: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
@@ -1314,7 +1403,7 @@ const calculateTaskCompletion = (tasks = []) => {
                     <select
                       required
                       value={selectedEmployee.department || ""}
-                      onChange={e => setSelectedEmployee({...selectedEmployee, department: e.target.value})}
+                      onChange={e => setSelectedEmployee({ ...selectedEmployee, department: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="">Select Department</option>
@@ -1329,7 +1418,7 @@ const calculateTaskCompletion = (tasks = []) => {
                       type="text"
                       required
                       value={selectedEmployee.position || ""}
-                      onChange={e => setSelectedEmployee({...selectedEmployee, position: e.target.value})}
+                      onChange={e => setSelectedEmployee({ ...selectedEmployee, position: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
@@ -1340,7 +1429,7 @@ const calculateTaskCompletion = (tasks = []) => {
                       required
                       min="0"
                       value={selectedEmployee.salary || ""}
-                      onChange={e => setSelectedEmployee({...selectedEmployee, salary: e.target.value})}
+                      onChange={e => setSelectedEmployee({ ...selectedEmployee, salary: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
@@ -1348,7 +1437,7 @@ const calculateTaskCompletion = (tasks = []) => {
                     <label className="block text-sm font-medium text-gray-700 mb-1">Employee Type</label>
                     <select
                       value={selectedEmployee.employeeType || "Employee"}
-                      onChange={e => setSelectedEmployee({...selectedEmployee, employeeType: e.target.value})}
+                      onChange={e => setSelectedEmployee({ ...selectedEmployee, employeeType: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="Employee">Employee</option>
@@ -1359,7 +1448,7 @@ const calculateTaskCompletion = (tasks = []) => {
                     <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
                     <select
                       value={selectedEmployee.status || "Active"}
-                      onChange={e => setSelectedEmployee({...selectedEmployee, status: e.target.value})}
+                      onChange={e => setSelectedEmployee({ ...selectedEmployee, status: e.target.value })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="Active">Active</option>
@@ -1417,13 +1506,13 @@ const calculateTaskCompletion = (tasks = []) => {
                   <div><p className="text-sm text-gray-500">Attendance</p><p className="font-medium">{selectedEmployee.attendance || 0}%</p></div>
                   <div><p className="text-sm text-gray-500">Tasks Completed</p><p className="font-medium">{selectedEmployee.completedTasks || 0}/{selectedEmployee.totalTasks || 0}</p></div>
                   <div>
-                <p className="text-sm text-gray-500">Task Completion Rate</p>
-                <p className="font-medium">
-                  {calculateTaskCompletion(selectedEmployee.tasks || [])}%
-                </p>
-              </div>
+                    <p className="text-sm text-gray-500">Task Completion Rate</p>
+                    <p className="font-medium">
+                      {calculateTaskCompletion(selectedEmployee.tasks || [])}%
+                    </p>
+                  </div>
                 </div>
-                
+
                 {/* Tasks Section */}
                 {Array.isArray(selectedEmployee.tasks) && selectedEmployee.tasks.length > 0 && (
                   <div className="mt-8">
@@ -1435,11 +1524,10 @@ const calculateTaskCompletion = (tasks = []) => {
                             <p className="font-medium">{task.title}</p>
                             <p className="text-sm text-gray-600">{task.description}</p>
                           </div>
-                          <span className={`px-2 py-1 rounded-full text-xs ${
-                            (task.status === 'Completed' || task.status === 'completed') ? 'bg-green-100 text-green-800' : 
-                            task.status === 'In Progress' ? 'bg-yellow-100 text-yellow-800' : 
-                            'bg-red-100 text-red-800'
-                          }`}>
+                          <span className={`px-2 py-1 rounded-full text-xs ${(task.status === 'Completed' || task.status === 'completed') ? 'bg-green-100 text-green-800' :
+                            task.status === 'In Progress' ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-red-100 text-red-800'
+                            }`}>
                             {task.status}
                           </span>
                         </div>

@@ -61,6 +61,7 @@ const EmployeeManagement = () => {
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isResetPasswordModalOpen, setIsResetPasswordModalOpen] = useState(false);
   const [isPaySalaryModalOpen, setIsPaySalaryModalOpen] = useState(false);
   const [isCredentialsModalOpen, setIsCredentialsModalOpen] = useState(false);
@@ -68,7 +69,7 @@ const EmployeeManagement = () => {
   const [newEmployeeCredentials, setNewEmployeeCredentials] = useState(null);
 
   const token = localStorage.getItem("adminToken");
-  const API_URL = "https://crm-c1y4.onrender.com";
+  const API_URL = "https://crm-c1y4.onrender.com/api";
 
   const departments = [
     { id: 1, name: "Sales" },
@@ -90,7 +91,7 @@ const EmployeeManagement = () => {
         const data = await res.json();
         return data.isActive === true || data.isClockedIn === true;
       }
-    } catch (err) {}
+    } catch (err) { }
     try {
       const res = await fetch(`${API_URL}/attendance/${employeeId}/today`, {
         headers: { Authorization: `Bearer ${token}` }
@@ -99,7 +100,7 @@ const EmployeeManagement = () => {
         const data = await res.json();
         return data.isClockedIn === true || (data.attendanceRecord?.clockIn && !data.attendanceRecord?.clockOut);
       }
-    } catch (err) {}
+    } catch (err) { }
     return false;
   };
 
@@ -118,18 +119,20 @@ const EmployeeManagement = () => {
       const res = await fetch(`${API_URL}/employee/get/employee`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      if (!res.ok) throw new Error("Failed");
+      if (!res.ok) throw new Error("Failed to fetch employees");
       const data = await res.json();
       const list = Array.isArray(data) ? data : data.employees || data.data || [];
 
       const statusMap = await fetchAllLiveStatus(list);
       const final = list.map(emp => ({
         ...emp,
-        isOnline: statusMap[emp._id] || false
+        isOnline: statusMap[emp._id] || false,
+        pendingSalary: emp.pendingSalary || 0
       }));
 
       setEmployees(final);
     } catch (err) {
+      console.error("Fetch employees error:", err);
       alert("Failed to load employees");
     } finally {
       setLoading(false);
@@ -137,8 +140,7 @@ const EmployeeManagement = () => {
   };
 
   useEffect(() => {
-     fetchEmployees();
-  
+    fetchEmployees();
   }, [token]);
 
   // === MODAL STATES ===
@@ -160,8 +162,8 @@ const EmployeeManagement = () => {
   const handleAdd = async (e) => {
     e.preventDefault();
     const required = ["name", "email", "department", "position", "salary", "joiningDate", "loginId", "password"];
-    if (required.some(f => !newEmployee[f])) return alert("Fill all fields");
-    if (newEmployee.password.length < 6) return alert("Password too short");
+    if (required.some(f => !newEmployee[f])) return alert("Please fill all required fields");
+    if (newEmployee.password.length < 6) return alert("Password must be at least 6 characters");
 
     try {
       const res = await fetch(`${API_URL}/employee/create/employee`, {
@@ -170,14 +172,27 @@ const EmployeeManagement = () => {
         body: JSON.stringify({ ...newEmployee, salary: +newEmployee.salary, department: +newEmployee.department })
       });
       if (res.ok) {
-        setNewEmployeeCredentials({ name: newEmployee.name, email: newEmployee.email, loginId: newEmployee.loginId, password: newEmployee.password });
+        setNewEmployeeCredentials({
+          name: newEmployee.name,
+          email: newEmployee.email,
+          loginId: newEmployee.loginId,
+          password: newEmployee.password
+        });
         setIsCredentialsModalOpen(true);
         setIsAddModalOpen(false);
         fetchEmployees();
-        setSuccess("Employee added!");
-        setNewEmployee({ name: "", email: "", phone: "", department: "", position: "", salary: "", joiningDate: "", loginId: "", password: "" });
+        setSuccess("Employee added successfully!");
+        setNewEmployee({
+          name: "", email: "", phone: "", department: "", position: "", salary: "", joiningDate: "",
+          loginId: "", password: ""
+        });
+      } else {
+        alert("Failed to create employee");
       }
-    } catch (err) { alert("Error"); }
+    } catch (err) {
+      console.error("Add employee error:", err);
+      alert("Error creating employee");
+    }
   };
 
   const handleEdit = async (e) => {
@@ -188,14 +203,23 @@ const EmployeeManagement = () => {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ ...selectedEmployee, salary: +selectedEmployee.salary, department: +selectedEmployee.department })
       });
-      if (res.ok) { fetchEmployees(); setIsEditModalOpen(false); setSuccess("Updated!"); }
-    } catch (err) { alert("Error"); }
+      if (res.ok) {
+        fetchEmployees();
+        setIsEditModalOpen(false);
+        setSuccess("Employee updated successfully!");
+      } else {
+        alert("Failed to update employee");
+      }
+    } catch (err) {
+      console.error("Edit employee error:", err);
+      alert("Error updating employee");
+    }
   };
 
   const handleResetPassword = async (e) => {
     e.preventDefault();
     if (resetPasswordData.newPassword !== resetPasswordData.confirmPassword) return alert("Passwords don't match");
-    if (resetPasswordData.newPassword.length < 6) return alert("Too short");
+    if (resetPasswordData.newPassword.length < 6) return alert("Password must be at least 6 characters");
 
     try {
       const res = await fetch(`${API_URL}/employee/${resetPasswordData.employeeId}/reset-password`, {
@@ -204,12 +228,21 @@ const EmployeeManagement = () => {
         body: JSON.stringify({ newPassword: resetPasswordData.newPassword })
       });
       if (res.ok) {
-        setNewEmployeeCredentials({ name: resetPasswordData.employeeName, loginId: employees.find(e => e._id === resetPasswordData.employeeId)?.loginId, password: resetPasswordData.newPassword });
+        setNewEmployeeCredentials({
+          name: resetPasswordData.employeeName,
+          loginId: employees.find(e => e._id === resetPasswordData.employeeId)?.loginId,
+          password: resetPasswordData.newPassword
+        });
         setIsResetPasswordModalOpen(false);
         setIsCredentialsModalOpen(true);
-        setSuccess("Password reset!");
+        setSuccess("Password reset successfully!");
+      } else {
+        alert("Failed to reset password");
       }
-    } catch (err) { alert("Error"); }
+    } catch (err) {
+      console.error("Reset password error:", err);
+      alert("Error resetting password");
+    }
   };
 
   const handlePaySalary = async (e) => {
@@ -218,25 +251,49 @@ const EmployeeManagement = () => {
       const res = await fetch(`${API_URL}/salary/pay/${paySalaryData.employeeId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ amount: +paySalaryData.amount, month: paySalaryData.month, year: paySalaryData.year, notes: paySalaryData.notes })
+        body: JSON.stringify({
+          amount: +paySalaryData.amount,
+          month: paySalaryData.month,
+          year: paySalaryData.year,
+          notes: paySalaryData.notes
+        })
       });
-      if (res.ok) { setIsPaySalaryModalOpen(false); fetchEmployees(); setSuccess("Salary paid!"); }
-    } catch (err) { alert("Error"); }
+      if (res.ok) {
+        setIsPaySalaryModalOpen(false);
+        fetchEmployees();
+        setSuccess("Salary paid successfully!");
+      } else {
+        alert("Failed to pay salary");
+      }
+    } catch (err) {
+      console.error("Pay salary error:", err);
+      alert("Error paying salary");
+    }
   };
 
   const handleDelete = async (id) => {
-    if (!confirm("Delete employee?")) return;
+    if (!confirm("Are you sure you want to delete this employee?")) return;
     try {
-      await fetch(`${API_URL}/employee/delete/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
-      fetchEmployees();
-      setSuccess("Deleted!");
-    } catch (err) { alert("Error"); }
+      const res = await fetch(`${API_URL}/employee/delete/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        fetchEmployees();
+        setSuccess("Employee deleted successfully!");
+      } else {
+        alert("Failed to delete employee");
+      }
+    } catch (err) {
+      console.error("Delete employee error:", err);
+      alert("Error deleting employee");
+    }
   };
 
   const copyCredentialsToClipboard = () => {
     const text = `Name: ${newEmployeeCredentials.name}\nEmail: ${newEmployeeCredentials.email}\nLogin ID: ${newEmployeeCredentials.loginId}\nPassword: ${newEmployeeCredentials.password}`;
     navigator.clipboard.writeText(text);
-    alert("Copied!");
+    alert("Credentials copied to clipboard!");
   };
 
   // === FILTERED EMPLOYEES ===
@@ -252,7 +309,9 @@ const EmployeeManagement = () => {
 
   const onlineCount = employees.filter(e => e.isOnline).length;
 
-  useEffect(() => { if (success) setTimeout(() => setSuccess(""), 5000); }, [success]);
+  useEffect(() => {
+    if (success) setTimeout(() => setSuccess(""), 5000);
+  }, [success]);
 
   if (!token) return <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">Redirecting...</div>;
 
@@ -262,8 +321,13 @@ const EmployeeManagement = () => {
         <h1 className="text-4xl font-bold text-center mb-2">Employee Management</h1>
         <p className="text-center text-gray-600 mb-6">Real-time Live Status Tracking</p>
 
-        {success && <div className="bg-green-100 text-green-800 p-4 rounded-lg mb-4 text-center">{success}</div>}
+        {success && (
+          <div className="bg-green-100 text-green-800 p-4 rounded-lg mb-4 text-center">
+            {success}
+          </div>
+        )}
 
+        {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <div className="bg-white p-5 rounded-xl shadow text-center">
             <p className="text-gray-600">Total Employees</p>
@@ -278,35 +342,54 @@ const EmployeeManagement = () => {
             <p className="text-3xl font-bold text-red-600">{employees.length - onlineCount}</p>
           </div>
           <div className="bg-white p-5 rounded-xl shadow text-center">
-            <button onClick={fetchEmployees} className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700">
+            <button
+              onClick={fetchEmployees}
+              className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
+            >
               Refresh Status
             </button>
           </div>
         </div>
 
+        {/* Controls and Table */}
         <div className="bg-white rounded-xl shadow overflow-hidden">
           <div className="p-6 border-b flex flex-col md:flex-row justify-between gap-4">
             <h2 className="text-2xl font-bold">All Employees</h2>
             <div className="flex gap-3 flex-wrap">
-              <input
-                type="text"
-                placeholder="Search..."
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                className="px-4 py-2 border rounded-lg"
-              />
-              <select value={departmentFilter} onChange={e => setDepartmentFilter(e.target.value)} className="px-4 py-2 border rounded-lg">
+              <div className="relative">
+
+                <input
+                  type="text"
+                  placeholder="Search employees..."
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                  className="pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+              <select
+                value={departmentFilter}
+                onChange={e => setDepartmentFilter(e.target.value)}
+                className="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
                 <option value="all">All Departments</option>
-                {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                {departments.map(d => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
               </select>
-              {/* <button onClick={() => setIsAddModalOpen(true)} className="bg-blue-600 text-white px-5 py-2 rounded-lg flex items-center gap-2">
+              <button
+                onClick={() => setIsAddModalOpen(true)}
+                className="bg-blue-600 text-white px-5 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 transition-colors"
+              >
                 <UserIcon /> Add Employee
-              </button> */}
+              </button>
             </div>
           </div>
 
           {loading ? (
-            <div className="p-10 text-center">Loading live status...</div>
+            <div className="p-10 text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+              <p className="mt-2 text-gray-600">Loading live status...</p>
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -317,8 +400,8 @@ const EmployeeManagement = () => {
                     <th className="px-6 py-4 text-left">Email</th>
                     <th className="px-6 py-4 text-left">Department</th>
                     <th className="px-6 py-4 text-left">Position</th>
-                    {/* <th className="px-6 py-4 text-left">Salary</th>
-                    <th className="px-6 py-4 text-center">Actions</th> */}
+                    <th className="px-6 py-4 text-left">Salary</th>
+                    <th className="px-6 py-4 text-center">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
@@ -334,18 +417,70 @@ const EmployeeManagement = () => {
                       </td>
                       <td className="px-6 py-4 font-medium">{emp.name}</td>
                       <td className="px-6 py-4">{emp.email}</td>
-                      <td className="px-6 py-4">{departments.find(d => d.id === emp.department)?.name || "—"}</td>
+                      <td className="px-6 py-4">
+                        {departments.find(d => d.id === emp.department)?.name || "—"}
+                      </td>
                       <td className="px-6 py-4">{emp.position}</td>
-                      {/* <td className="px-6 py-4">₹{emp.salary?.toLocaleString()}</td> */}
-                      {/* <td className="px-6 py-4 text-center">
-                        <div className="flex justify-center gap-3">
-                          <button onClick={() => setSelectedEmployee(emp)} className="text-blue-600 hover:bg-blue-50 p-2 rounded"><EyeIcon /></button>
-                          <button onClick={() => { setSelectedEmployee(emp); setIsEditModalOpen(true); }} className="text-yellow-600 hover:bg-yellow-50 p-2 rounded"><EditIcon /></button>
-                          <button onClick={() => { setResetPasswordData({ employeeId: emp._id, employeeName: emp.name, newPassword: "", confirmPassword: "" }); setIsResetPasswordModalOpen(true); }} className="text-green-600 hover:bg-green-50 p-2 rounded">Reset</button>
-                          {emp.pendingSalary > 0 && <button onClick={() => { setPaySalaryData({ employeeId: emp._id, employeeName: emp.name, amount: emp.pendingSalary, month: new Date().getMonth() + 1, year: new Date().getFullYear(), notes: "" }); setIsPaySalaryModalOpen(true); }} className="text-green-700"><CheckCircleIcon /></button>}
-                          <button onClick={() => handleDelete(emp._id)} className="text-red-600 hover:bg-red-50 p-2 rounded"><DeleteIcon /></button>
+                      <td className="px-6 py-4">₹{emp.salary?.toLocaleString()}</td>
+                      <td className="px-6 py-4">
+                        <div className="flex justify-center gap-2">
+                          <button
+                            onClick={() => { setSelectedEmployee(emp); setIsViewModalOpen(true); }}
+                            className="text-blue-600 hover:bg-blue-50 p-2 rounded transition-colors"
+                            title="View Details"
+                          >
+                            <EyeIcon />
+                          </button>
+                          <button
+                            onClick={() => { setSelectedEmployee(emp); setIsEditModalOpen(true); }}
+                            className="text-yellow-600 hover:bg-yellow-50 p-2 rounded transition-colors"
+                            title="Edit"
+                          >
+                            <EditIcon />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setResetPasswordData({
+                                employeeId: emp._id,
+                                employeeName: emp.name,
+                                newPassword: "",
+                                confirmPassword: ""
+                              });
+                              setIsResetPasswordModalOpen(true);
+                            }}
+                            className="text-green-600 hover:bg-green-50 p-2 rounded transition-colors"
+                            title="Reset Password"
+                          >
+                            Reset
+                          </button>
+                          {emp.pendingSalary > 0 && (
+                            <button
+                              onClick={() => {
+                                setPaySalaryData({
+                                  employeeId: emp._id,
+                                  employeeName: emp.name,
+                                  amount: emp.pendingSalary,
+                                  month: new Date().getMonth() + 1,
+                                  year: new Date().getFullYear(),
+                                  notes: ""
+                                });
+                                setIsPaySalaryModalOpen(true);
+                              }}
+                              className="text-green-700 hover:bg-green-50 p-2 rounded transition-colors"
+                              title="Pay Salary"
+                            >
+                              <CheckCircleIcon />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleDelete(emp._id)}
+                            className="text-red-600 hover:bg-red-50 p-2 rounded transition-colors"
+                            title="Delete"
+                          >
+                            <DeleteIcon />
+                          </button>
                         </div>
-                      </td> */}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -354,47 +489,498 @@ const EmployeeManagement = () => {
           )}
         </div>
 
-        {/* All Modals (Add, Edit, View, Reset Password, Pay Salary, Credentials) */}
-        {/* Same as your previous full version — just cleaner and faster */}
-        {/* They are fully included below for completeness */}
-
-        {/* ADD MODAL */}
+        {/* ADD EMPLOYEE MODAL */}
         {isAddModalOpen && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-8">
-              <div className="flex justify-between items-center mb-6">
+            <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="flex justify-between items-center p-6 border-b">
                 <h3 className="text-2xl font-bold">Add New Employee</h3>
-                {/* <button onClick={() => setIsAddModalOpen(false)}><CloseIcon /></button> */}
+                <button
+                  onClick={() => setIsAddModalOpen(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <CloseIcon />
+                </button>
               </div>
-              <form onSubmit={handleAdd} className="space-y-4">
-                {/* All input fields here - same as before */}
+              <form onSubmit={handleAdd} className="p-6 space-y-6">
                 <div className="grid md:grid-cols-2 gap-4">
-                  <input placeholder="Full Name" required value={newEmployee.name} onChange={e => setNewEmployee({...newEmployee, name: e.target.value})} className="px-4 py-3 border rounded-lg" />
-                  <input placeholder="Email" type="email" required value={newEmployee.email} onChange={e => setNewEmployee({...newEmployee, email: e.target.value})} className="px-4 py-3 border rounded-lg" />
-                  <input placeholder="Phone" value={newEmployee.phone} onChange={e => setNewEmployee({...newEmployee, phone: e.target.value})} className="px-4 py-3 border rounded-lg" />
-                  <select required value={newEmployee.department} onChange={e => setNewEmployee({...newEmployee, department: e.target.value})} className="px-4 py-3 border rounded-lg">
-                    <option value="">Department</option>
-                    {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                  </select>
-                  <input placeholder="Position" required value={newEmployee.position} onChange={e => setNewEmployee({...newEmployee, position: e.target.value})} className="px-4 py-3 border rounded-lg" />
-                  <input placeholder="Salary" type="number" required value={newEmployee.salary} onChange={e => setNewEmployee({...newEmployee, salary: e.target.value})} className="px-4 py-3 border rounded-lg" />
-                  <input type="date" required value={newEmployee.joiningDate} onChange={e => setNewEmployee({...newEmployee, joiningDate: e.target.value})} className="px-4 py-3 border rounded-lg" />
-                  <input placeholder="Login ID" required value={newEmployee.loginId} onChange={e => setNewEmployee({...newEmployee, loginId: e.target.value})} className="px-4 py-3 border rounded-lg" />
-                  <input placeholder="Password (min 6)" type="text" required minLength="6" value={newEmployee.password} onChange={e => setNewEmployee({...newEmployee, password: e.target.value})} className="px-4 py-3 border rounded-lg" />
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Full Name *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Enter full name"
+                      value={newEmployee.name}
+                      onChange={e => setNewEmployee({ ...newEmployee, name: e.target.value })}
+                      className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Email *</label>
+                    <input
+                      type="email"
+                      required
+                      placeholder="Enter email"
+                      value={newEmployee.email}
+                      onChange={e => setNewEmployee({ ...newEmployee, email: e.target.value })}
+                      className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Phone</label>
+                    <input
+                      type="tel"
+                      placeholder="Enter phone number"
+                      value={newEmployee.phone}
+                      onChange={e => setNewEmployee({ ...newEmployee, phone: e.target.value })}
+                      className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Department *</label>
+                    <select
+                      required
+                      value={newEmployee.department}
+                      onChange={e => setNewEmployee({ ...newEmployee, department: e.target.value })}
+                      className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="">Select Department</option>
+                      {departments.map(d => (
+                        <option key={d.id} value={d.id}>{d.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Position *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Enter position"
+                      value={newEmployee.position}
+                      onChange={e => setNewEmployee({ ...newEmployee, position: e.target.value })}
+                      className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Salary (₹) *</label>
+                    <input
+                      type="number"
+                      required
+                      placeholder="Enter salary"
+                      value={newEmployee.salary}
+                      onChange={e => setNewEmployee({ ...newEmployee, salary: e.target.value })}
+                      className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Joining Date *</label>
+                    <input
+                      type="date"
+                      required
+                      value={newEmployee.joiningDate}
+                      onChange={e => setNewEmployee({ ...newEmployee, joiningDate: e.target.value })}
+                      className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Login ID *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Enter login ID"
+                      value={newEmployee.loginId}
+                      onChange={e => setNewEmployee({ ...newEmployee, loginId: e.target.value })}
+                      className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Password (min 6) *</label>
+                    <input
+                      type="text"
+                      required
+                      minLength="6"
+                      placeholder="Enter password"
+                      value={newEmployee.password}
+                      onChange={e => setNewEmployee({ ...newEmployee, password: e.target.value })}
+                      className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
                 </div>
-                <div className="flex justify-end gap-4 mt-6">
-                  <button type="button" onClick={() => setIsAddModalOpen(false)} className="px-6 py-3 bg-gray-500 text-white rounded-lg">Cancel</button>
-                  <button type="submit" className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Create Employee</button>
+                <div className="flex justify-end gap-4 pt-6 border-t">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddModalOpen(false)}
+                    className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    Create Employee
+                  </button>
                 </div>
               </form>
             </div>
           </div>
         )}
 
-        {/* Edit, View, Reset Password, Pay Salary, Credentials Modals */}
-        {/* (All fully functional — same as your original, just cleaner) */}
-        {/* Let me know if you want them expanded — but this version is complete and working perfectly */}
+        {/* VIEW EMPLOYEE MODAL */}
+        {isViewModalOpen && selectedEmployee && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full">
+              <div className="flex justify-between items-center p-6 border-b">
+                <h3 className="text-2xl font-bold">Employee Details</h3>
+                <button
+                  onClick={() => setIsViewModalOpen(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <CloseIcon />
+                </button>
+              </div>
+              <div className="p-6 space-y-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 text-xl font-bold">
+                    {selectedEmployee.name?.split(' ').map(n => n[0]).join('')}
+                  </div>
+                  <div>
+                    <h4 className="text-xl font-bold">{selectedEmployee.name}</h4>
+                    <p className="text-gray-600">{selectedEmployee.email}</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="font-medium">Department:</span>
+                    <p>{departments.find(d => d.id === selectedEmployee.department)?.name || "—"}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium">Position:</span>
+                    <p>{selectedEmployee.position}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium">Salary:</span>
+                    <p>₹{selectedEmployee.salary?.toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium">Status:</span>
+                    <p className={selectedEmployee.isOnline ? "text-green-600" : "text-red-600"}>
+                      {selectedEmployee.isOnline ? "Online" : "Offline"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="flex justify-end p-6 border-t">
+                <button
+                  onClick={() => setIsViewModalOpen(false)}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
+        {/* EDIT EMPLOYEE MODAL */}
+        {isEditModalOpen && selectedEmployee && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="flex justify-between items-center p-6 border-b">
+                <h3 className="text-2xl font-bold">Edit Employee</h3>
+                <button
+                  onClick={() => setIsEditModalOpen(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <CloseIcon />
+                </button>
+              </div>
+              <form onSubmit={handleEdit} className="p-6 space-y-6">
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
+                    <input
+                      type="text"
+                      required
+                      value={selectedEmployee.name}
+                      onChange={e => setSelectedEmployee({ ...selectedEmployee, name: e.target.value })}
+                      className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                    <input
+                      type="email"
+                      required
+                      value={selectedEmployee.email}
+                      onChange={e => setSelectedEmployee({ ...selectedEmployee, email: e.target.value })}
+                      className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Phone</label>
+                    <input
+                      type="tel"
+                      value={selectedEmployee.phone}
+                      onChange={e => setSelectedEmployee({ ...selectedEmployee, phone: e.target.value })}
+                      className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Department</label>
+                    <select
+                      value={selectedEmployee.department}
+                      onChange={e => setSelectedEmployee({ ...selectedEmployee, department: e.target.value })}
+                      className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      {departments.map(d => (
+                        <option key={d.id} value={d.id}>{d.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Position</label>
+                    <input
+                      type="text"
+                      required
+                      value={selectedEmployee.position}
+                      onChange={e => setSelectedEmployee({ ...selectedEmployee, position: e.target.value })}
+                      className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Salary (₹)</label>
+                    <input
+                      type="number"
+                      required
+                      value={selectedEmployee.salary}
+                      onChange={e => setSelectedEmployee({ ...selectedEmployee, salary: e.target.value })}
+                      className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-4 pt-6 border-t">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditModalOpen(false)}
+                    className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    Update Employee
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* RESET PASSWORD MODAL */}
+        {isResetPasswordModalOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full">
+              <div className="flex justify-between items-center p-6 border-b">
+                <h3 className="text-2xl font-bold">Reset Password</h3>
+                <button
+                  onClick={() => setIsResetPasswordModalOpen(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <CloseIcon />
+                </button>
+              </div>
+              <form onSubmit={handleResetPassword} className="p-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Employee</label>
+                  <p className="font-medium">{resetPasswordData.employeeName}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">New Password *</label>
+                  <input
+                    type="text"
+                    required
+                    minLength="6"
+                    placeholder="Enter new password"
+                    value={resetPasswordData.newPassword}
+                    onChange={e => setResetPasswordData({ ...resetPasswordData, newPassword: e.target.value })}
+                    className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Confirm Password *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Confirm new password"
+                    value={resetPasswordData.confirmPassword}
+                    onChange={e => setResetPasswordData({ ...resetPasswordData, confirmPassword: e.target.value })}
+                    className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+                <div className="flex justify-end gap-4 pt-6 border-t">
+                  <button
+                    type="button"
+                    onClick={() => setIsResetPasswordModalOpen(false)}
+                    className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    Reset Password
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* PAY SALARY MODAL */}
+        {isPaySalaryModalOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full">
+              <div className="flex justify-between items-center p-6 border-b">
+                <h3 className="text-2xl font-bold">Pay Salary</h3>
+                <button
+                  onClick={() => setIsPaySalaryModalOpen(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <CloseIcon />
+                </button>
+              </div>
+              <form onSubmit={handlePaySalary} className="p-6 space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Employee</label>
+                  <p className="font-medium">{paySalaryData.employeeName}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Amount (₹) *</label>
+                  <input
+                    type="number"
+                    required
+                    placeholder="Enter amount"
+                    value={paySalaryData.amount}
+                    onChange={e => setPaySalaryData({ ...paySalaryData, amount: e.target.value })}
+                    className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Month</label>
+                    <select
+                      value={paySalaryData.month}
+                      onChange={e => setPaySalaryData({ ...paySalaryData, month: e.target.value })}
+                      className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      {Array.from({ length: 12 }, (_, i) => (
+                        <option key={i + 1} value={i + 1}>
+                          {new Date(2000, i).toLocaleString('default', { month: 'long' })}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Year</label>
+                    <input
+                      type="number"
+                      value={paySalaryData.year}
+                      onChange={e => setPaySalaryData({ ...paySalaryData, year: e.target.value })}
+                      className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Notes</label>
+                  <textarea
+                    rows={3}
+                    placeholder="Additional notes"
+                    value={paySalaryData.notes}
+                    onChange={e => setPaySalaryData({ ...paySalaryData, notes: e.target.value })}
+                    className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+                <div className="flex justify-end gap-4 pt-6 border-t">
+                  <button
+                    type="button"
+                    onClick={() => setIsPaySalaryModalOpen(false)}
+                    className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                  >
+                    Pay Salary
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* CREDENTIALS MODAL */}
+        {isCredentialsModalOpen && newEmployeeCredentials && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full">
+              <div className="flex justify-between items-center p-6 border-b">
+                <h3 className="text-2xl font-bold">Employee Credentials</h3>
+                <button
+                  onClick={() => setIsCredentialsModalOpen(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <CloseIcon />
+                </button>
+              </div>
+              <div className="p-6 space-y-4">
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <p className="text-yellow-800 text-sm">
+                    <strong>Important:</strong> Save these credentials securely. They will not be shown again.
+                  </p>
+                </div>
+                <div className="space-y-3">
+                  <div>
+                    <span className="font-medium text-gray-700">Name:</span>
+                    <p className="mt-1">{newEmployeeCredentials.name}</p>
+                  </div>
+                  {newEmployeeCredentials.email && (
+                    <div>
+                      <span className="font-medium text-gray-700">Email:</span>
+                      <p className="mt-1">{newEmployeeCredentials.email}</p>
+                    </div>
+                  )}
+                  <div>
+                    <span className="font-medium text-gray-700">Login ID:</span>
+                    <p className="mt-1">{newEmployeeCredentials.loginId}</p>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Password:</span>
+                    <p className="mt-1 font-mono">{newEmployeeCredentials.password}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="flex justify-end gap-4 p-6 border-t">
+                <button
+                  onClick={copyCredentialsToClipboard}
+                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Copy to Clipboard
+                </button>
+                <button
+                  onClick={() => setIsCredentialsModalOpen(false)}
+                  className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
