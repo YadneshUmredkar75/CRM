@@ -56,7 +56,8 @@ app.use(express.json());
 // ------------- FULL CORS FIX ----------------
 const allowedOrigins = [
   "http://localhost:5173",
-  "https://crm-seven-jade.vercel.app", // your frontend
+  "https://crm-seven-jade.vercel.app",
+  "https://crm-r214yejox-yadneshs-projects-d6a3e3e2.vercel.app", // your frontend
 ];
 
 app.use((req, res, next) => {
