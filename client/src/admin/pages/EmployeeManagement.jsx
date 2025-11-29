@@ -133,9 +133,7 @@ const EmployeeManagement = () => {
     if (!employeeId) return { tasks: [], completedTasks: 0, totalTasks: 0 };
 
     try {
-      const response = await fetch(`${API_URL}/admin/tasks/${employeeId}`, {
-        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" }
-      });
+      const response = await fetch(`${API_URL}/admin/tasks/${employeeId}`);
       if (response.ok) {
         const data = await response.json();
         const tasks = Array.isArray(data) ? data : data.tasks || [];
@@ -146,9 +144,7 @@ const EmployeeManagement = () => {
 
     // Fallback
     try {
-      const empResponse = await fetch(`${API_URL}/employee/${employeeId}/tasks`, {
-        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" }
-      });
+      const empResponse = await fetch(`${API_URL}/employee/${employeeId}/tasks`);
       if (empResponse.ok) {
         const empData = await empResponse.json();
         const tasks = Array.isArray(empData) ? empData : empData.tasks || [];
@@ -165,9 +161,7 @@ const EmployeeManagement = () => {
     if (!employeeId) return { attendance: [], attendanceRate: 0, presentDays: 0, totalDays: 0 };
 
     try {
-      const response = await fetch(`${API_URL}/attendance/${employeeId}/attendance`, {
-        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" }
-      });
+      const response = await fetch(`${API_URL}/attendance/${employeeId}/attendance`);
       if (response.ok) {
         const data = await response.json();
         const records = Array.isArray(data) ? data : data.attendance || [];
@@ -180,9 +174,7 @@ const EmployeeManagement = () => {
 
     // Fallback
     try {
-      const empResponse = await fetch(`${API_URL}/attendance/admin/employee/${employeeId}/attendance`, {
-        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" }
-      });
+      const empResponse = await fetch(`${API_URL}/attendance/admin/employee/${employeeId}/attendance`);
       if (empResponse.ok) {
         const empData = await empResponse.json();
         const records = Array.isArray(empData) ? empData : empData.attendance || [];
@@ -199,9 +191,7 @@ const EmployeeManagement = () => {
   // === Fetch Performance (with fallback) ===
   const fetchEmployeePerformance = async (employeeId) => {
     try {
-      const response = await fetch(`${API_URL}/employee/${employeeId}/performance`, {
-        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" }
-      });
+      const response = await fetch(`${API_URL}/employee/${employeeId}/performance`);
       if (response.ok) {
         const data = await response.json();
         return { performance: data.performance || 0 };
@@ -227,9 +217,7 @@ const EmployeeManagement = () => {
     setError("");
 
     try {
-      const response = await fetch(`${API_URL}/employee/get/employee`, {
-        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" }
-      });
+      const response = await fetch(`${API_URL}/employee/get/employee`,);
 
       if (!response.ok) {
         if (response.status === 401) {
