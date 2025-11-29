@@ -6,7 +6,7 @@ import TaskCard from "../components/TaskCard";
 import { toast, Toaster } from "react-hot-toast";
 
 const IST = "Asia/Kolkata";
-const API_URL = "https://crm-c1y4.onrender.com"; // Your public backend
+const API_URL = "https://crm-c1y4.onrender.com/api"; // ADDED /api HERE
 
 const PRIORITY_OPTIONS = [
   { label: "Low", value: "low" },
@@ -16,7 +16,7 @@ const PRIORITY_OPTIONS = [
 ];
 const TYPE_OPTIONS = ["Daily", "Weekly", "Monthly", "Project"];
 
-const TaskTracker = ({ isManager = true }) => { // Default manager view for public use
+const TaskTracker = ({ isManager = true }) => {
   const [tasks, setTasks] = useState([]);
   const [newTask, setNewTask] = useState({
     title: "",
@@ -28,9 +28,6 @@ const TaskTracker = ({ isManager = true }) => { // Default manager view for publ
   });
   const [editTask, setEditTask] = useState(null);
   const [loading, setLoading] = useState(true);
-
-  // TOKEN COMPLETELY REMOVED - NO AUTH REQUIRED
-  // const token = localStorage.getItem("employeeToken");
 
   const ensureArray = (data) => {
     if (Array.isArray(data)) return data;
@@ -56,15 +53,27 @@ const TaskTracker = ({ isManager = true }) => { // Default manager view for publ
       const res = await fetch(`${API_URL}/employee/task`);
 
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || "Failed to load tasks");
+        // Handle HTML response (like 404 page)
+        const contentType = res.headers.get("content-type");
+        if (contentType && contentType.includes("text/html")) {
+          throw new Error("Server returned HTML instead of JSON. Check API endpoint.");
+        }
+
+        const text = await res.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(text);
+        } catch {
+          throw new Error(`Server error: ${res.status} ${res.statusText}`);
+        }
+        throw new Error(errorData.message || "Failed to load tasks");
       }
 
       const data = await res.json();
       const tasksArray = ensureArray(data);
       setTasks(tasksArray);
     } catch (err) {
-      console.error(err);
+      console.error("Fetch tasks error:", err);
       toast.error("Failed to load tasks: " + err.message);
       setTasks([]);
     } finally {
@@ -97,9 +106,18 @@ const TaskTracker = ({ isManager = true }) => { // Default manager view for publ
         body: JSON.stringify(payload),
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Failed to add task");
+      if (!res.ok) {
+        const text = await res.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(text);
+        } catch {
+          throw new Error(`Server error: ${res.status} ${res.statusText}`);
+        }
+        throw new Error(errorData.message || "Failed to add task");
+      }
 
+      const data = await res.json();
       const added = data.task || data;
       setTasks(prev => [added, ...prev]);
       setNewTask({ title: "", description: "", type: "Daily", priority: "medium", progress: 0, notes: "" });
@@ -131,9 +149,18 @@ const TaskTracker = ({ isManager = true }) => { // Default manager view for publ
         body: JSON.stringify(payload),
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Update failed");
+      if (!res.ok) {
+        const text = await res.text();
+        let errorData;
+        try {
+          errorData = JSON.parse(text);
+        } catch {
+          throw new Error(`Server error: ${res.status} ${res.statusText}`);
+        }
+        throw new Error(errorData.message || "Update failed");
+      }
 
+      const data = await res.json();
       const updatedTask = data.task || data;
       setTasks(prev => prev.map(t => getTaskId(t) === id ? updatedTask : t));
       setEditTask(null);
@@ -155,12 +182,14 @@ const TaskTracker = ({ isManager = true }) => { // Default manager view for publ
         method: "DELETE",
       });
 
-      if (!res.ok) throw new Error("Delete failed");
+      if (!res.ok) {
+        throw new Error("Delete failed");
+      }
 
       setTasks(prev => prev.filter(t => getTaskId(t) !== id));
       toast.success("Task deleted!");
     } catch (e) {
-      toast.error("Delete failed");
+      toast.error("Delete failed: " + e.message);
     }
   };
 
@@ -351,26 +380,63 @@ const TaskTracker = ({ isManager = true }) => { // Default manager view for publ
           </div>
         )}
 
-        {/* Edit Modal - Same as before */}
+        {/* Edit Modal */}
         {editTask && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
               <h3 className="text-xl font-semibold mb-4 text-gray-800">Update Task</h3>
               <div className="space-y-4">
-                <input type="text" value={editTask.title || ""} onChange={(e) => setEditTask({ ...editTask, title: e.target.value })} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500" />
-                <select value={editTask.type || "Daily"} onChange={(e) => setEditTask({ ...editTask, type: e.target.value })} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                <input
+                  type="text"
+                  value={editTask.title || ""}
+                  onChange={(e) => setEditTask({ ...editTask, title: e.target.value })}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                />
+                <select
+                  value={editTask.type || "Daily"}
+                  onChange={(e) => setEditTask({ ...editTask, type: e.target.value })}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                >
                   {TYPE_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
-                <select value={editTask.priority || "medium"} onChange={(e) => setEditTask({ ...editTask, priority: e.target.value })} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500">
+                <select
+                  value={editTask.priority || "medium"}
+                  onChange={(e) => setEditTask({ ...editTask, priority: e.target.value })}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                >
                   {PRIORITY_OPTIONS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
                 </select>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Progress: {editTask.progress || 0}%</label>
-                  <input type="range" value={editTask.progress || 0} onChange={(e) => setEditTask({ ...editTask, progress: parseInt(e.target.value) })} className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer" min="0" max="100" />
-                  <input type="number" value={editTask.progress || 0} onChange={(e) => setEditTask({ ...editTask, progress: Math.min(100, Math.max(0, parseInt(e.target.value) || 0)) })} className="w-full mt-2 p-2 border border-gray-300 rounded-lg text-center" min="0" max="100" />
+                  <input
+                    type="range"
+                    value={editTask.progress || 0}
+                    onChange={(e) => setEditTask({ ...editTask, progress: parseInt(e.target.value) })}
+                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                    min="0"
+                    max="100"
+                  />
+                  <input
+                    type="number"
+                    value={editTask.progress || 0}
+                    onChange={(e) => setEditTask({ ...editTask, progress: Math.min(100, Math.max(0, parseInt(e.target.value) || 0)) })}
+                    className="w-full mt-2 p-2 border border-gray-300 rounded-lg text-center"
+                    min="0"
+                    max="100"
+                  />
                 </div>
-                <textarea value={editTask.description || ""} onChange={(e) => setEditTask({ ...editTask, description: e.target.value })} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500" rows="3" />
-                <textarea value={editTask.notes || ""} onChange={(e) => setEditTask({ ...editTask, notes: e.target.value })} className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500" rows="2" />
+                <textarea
+                  value={editTask.description || ""}
+                  onChange={(e) => setEditTask({ ...editTask, description: e.target.value })}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                  rows="3"
+                />
+                <textarea
+                  value={editTask.notes || ""}
+                  onChange={(e) => setEditTask({ ...editTask, notes: e.target.value })}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                  rows="2"
+                />
               </div>
               <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-200">
                 <button onClick={() => setEditTask(null)} className="px-4 py-2 text-gray-600 hover:text-gray-800">Cancel</button>

@@ -125,7 +125,7 @@ const DashboardAdmin = () => {
     { path: ".", label: "Dashboard", icon: DashboardIcon }, // Relative path
     { path: "student-management", label: "Student Management", icon: StudentIcon },
     { path: "employees", label: "Employee Management", icon: EmployeeIcon },
-    { path: " monitoring-task", label: "Monitoring Task", icon: EmployeeIcon },
+    { path: "monitoring-task", label: "Monitoring Task", icon: EmployeeIcon },
 
     { path: "courses", label: "Course Management", icon: CourseIcon },
     { path: "attendance", label: "Attendance", icon: AttendanceIcon },
