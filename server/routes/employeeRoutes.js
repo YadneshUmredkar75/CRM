@@ -5,9 +5,8 @@ import {
   login, resetPassword, changePassword, getEmployeePassword,
   getTasks, addTask, updateTask, deleteTask, getEmployeeTasks, getEmployeeAttendance, getEmployeePerformance,
   getEmployeeById, getCurrentEmployee, updateProfile,
-} from "../controllers/employeeController.js"; // Make sure the path is correct
-import { protectEmployee } from "../middleware/authEmployee.js";
-import { protect } from "../middleware/auth.js";
+} from "../controllers/employeeController.js";
+
 const router = Router();
 
 // PUBLIC ROUTES - NO PROTECTION
@@ -21,7 +20,7 @@ router.get("/task", getTasks);
 router.post("/task", addTask);
 router.patch("/task/:id", updateTask);
 router.delete("/task/:id", deleteTask);
-router.get("/employee/:id/tasks", getTasks);
+router.get("/employee/:id/tasks", getEmployeeTasks);
 router.get("/employee/:id/", getEmployeeById);
 
 // ADMIN ROUTES - NO PROTECTION

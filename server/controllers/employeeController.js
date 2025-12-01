@@ -602,31 +602,9 @@ export const getEmployeePassword = async (req, res) => {
 };
 
 // ---------------------------------------------------------------------
-// TASK MANAGEMENT
+// TASK MANAGEMENT - ADD TASK FUNCTION
 // ---------------------------------------------------------------------
-export const getTasks = async (req, res) => {
-  try {
-    const tasks = await Task.find({})
-      .sort({ createdAt: -1 })
-      .populate('employeeId', 'name email');
-
-    res.json({
-      success: true,
-      tasks,
-      count: tasks.length
-    });
-  } catch (err) {
-    console.error("Get tasks error:", err);
-    res.status(500).json({
-      success: false,
-      message: 'Server error',
-      error: err.message,
-    });
-  }
-};
-
-// In your backend task controller (addTask function)
-const addTask = async (req, res) => {
+export const addTask = async (req, res) => {
   try {
     const { title, description, type, priority, progress, notes, employeeId } = req.body;
 
@@ -651,6 +629,7 @@ const addTask = async (req, res) => {
     });
   }
 };
+
 export const updateTask = async (req, res) => {
   const { id } = req.params;
   const updates = req.body;
@@ -753,6 +732,30 @@ export const deleteTask = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Server error",
+      error: err.message,
+    });
+  }
+};
+
+// ---------------------------------------------------------------------
+// GET TASKS
+// ---------------------------------------------------------------------
+export const getTasks = async (req, res) => {
+  try {
+    const tasks = await Task.find({})
+      .sort({ createdAt: -1 })
+      .populate('employeeId', 'name email');
+
+    res.json({
+      success: true,
+      tasks,
+      count: tasks.length
+    });
+  } catch (err) {
+    console.error("Get tasks error:", err);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
       error: err.message,
     });
   }
