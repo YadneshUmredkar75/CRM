@@ -15,23 +15,25 @@ import {
   updateLeadIncentive,
 } from "../controllers/leadController.js";
 
-import { protectEmployee } from "../middleware/authEmployee.js";
-import { protect } from "../middleware/auth.js"; // your admin middleware
+// import { protectEmployee } from "../middleware/authEmployee.js";
+// import { protect } from "../middleware/auth.js"; // REMOVED PROTECTION FOR NOW
 
 const router = express.Router();
 
 // ==================== EMPLOYEE ROUTES ====================
-router.post("/", protectEmployee, createLead);
-router.get("/my-leads", protectEmployee, getAllLeads);
-router.get("/my-stats", protectEmployee, getLeadStats);
-router.patch("/:id/status", protectEmployee, updateLeadStatus);
-router.delete("/:id", protectEmployee, deleteLead);
+// Removed protection for testing
+router.post("/", createLead);
+router.get("/my-leads", getAllLeads);
+router.get("/my-stats", getLeadStats);
+router.patch("/:id/status", updateLeadStatus);
+router.delete("/:id", deleteLead);
 
 // ==================== ADMIN ROUTES ====================
-// These will ONLY run protect (admin middleware), NEVER protectEmployee
-router.get("/all", protect, getAllLeadsAdmin);
-router.get("/stats/admin", protect, getLeadStatsAdmin);
-router.get("/employee/:employeeId", protect, getLeadsByEmployee);
-router.patch("/lead/:id/mark-paid", protect, markLeadPaymentDone);
-router.patch("/:id", protect, updateLeadIncentive);
+// Removed protection for testing
+router.get("/all", getAllLeadsAdmin);
+router.get("/stats/admin", getLeadStatsAdmin);
+router.get("/employee/:employeeId", getLeadsByEmployee);
+router.patch("/lead/:id/mark-paid", markLeadPaymentDone);
+router.patch("/:id", updateLeadIncentive);
+
 export default router;

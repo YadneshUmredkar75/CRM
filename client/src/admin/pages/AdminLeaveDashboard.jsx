@@ -29,7 +29,8 @@ export default function AdminLeaveDashboard() {
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
 
-  const token = localStorage.getItem('token') || localStorage.getItem('adminToken');
+  // Try multiple possible token locations
+  const token = localStorage.getItem('adminToken') || localStorage.getItem('token') || localStorage.getItem('employeeToken');
 
   const showMessage = (msg, type = 'success') => {
     if (type === 'success') setSuccess(msg);
@@ -37,49 +38,89 @@ export default function AdminLeaveDashboard() {
     setTimeout(() => { setSuccess(''); setError(''); }, 5000);
   };
 
-  // Fetch data only when called
+  // Enhanced fetch with better error handling
   const fetchData = useCallback(async () => {
-    if (!token) return;
+    if (!token) {
+      showMessage('No authentication token found', 'error');
+      return;
+    }
+
     setLoading(true);
     try {
       const [leavesRes, statsRes] = await Promise.all([
-        fetch(`${API_BASE}/all`, { headers: { 'Authorization': `Bearer ${token}` } }),
-        fetch(`${API_BASE}/stats/admin`, { headers: { 'Authorization': `Bearer ${token}` } })
+        fetch(`${API_BASE}/all`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }),
+        fetch(`${API_BASE}/stats/admin`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        })
       ]);
 
-      if (leavesRes.ok) {
-        const data = await leavesRes.json();
-        const leavesData = (data.data || data.leaves || []).map(leave => ({
-          ...leave,
-          employeeName: leave.employeeName || leave.employee?.name || 'Unknown Employee',
-          employeeId: leave.employeeId || leave.employee?.loginId || 'N/A',
-          position: leave.position || leave.employee?.position || 'N/A',
-          leaveType: leave.leaveType || 'Unknown',
-          reason: leave.reason || 'No reason provided',
-          status: (leave.status || 'pending').toLowerCase(),
-        }));
-        setLeaves(leavesData);
+      // Handle leaves response
+      if (!leavesRes.ok) {
+        if (leavesRes.status === 401) {
+          throw new Error('Authentication failed. Please login again.');
+        }
+        if (leavesRes.status === 404) {
+          throw new Error('Leaves endpoint not found. Check API route.');
+        }
+        throw new Error(`Failed to load leaves: ${leavesRes.status} ${leavesRes.statusText}`);
       }
 
+      const leavesData = await leavesRes.json();
+      const processedLeaves = (leavesData.data || leavesData.leaves || leavesData || []).map(leave => ({
+        ...leave,
+        employeeName: leave.employeeName || leave.employee?.name || 'Unknown Employee',
+        employeeId: leave.employeeId || leave.employee?.loginId || 'N/A',
+        position: leave.position || leave.employee?.position || 'N/A',
+        leaveType: leave.leaveType || 'Unknown',
+        reason: leave.reason || 'No reason provided',
+        status: (leave.status || 'pending').toLowerCase(),
+      }));
+      setLeaves(processedLeaves);
+
+      // Handle stats response
       if (statsRes.ok) {
         const statsData = await statsRes.json();
-        setStats(statsData.data || { totalLeaves: 0, pending: 0, approved: 0, rejected: 0 });
+        setStats(statsData.data || statsData || {
+          totalLeaves: 0,
+          pending: 0,
+          approved: 0,
+          rejected: 0
+        });
+      } else {
+        console.warn('Stats endpoint failed, using default stats');
+        setStats({
+          totalLeaves: processedLeaves.length,
+          pending: processedLeaves.filter(l => l.status === 'pending').length,
+          approved: processedLeaves.filter(l => l.status === 'approved').length,
+          rejected: processedLeaves.filter(l => l.status === 'rejected').length
+        });
       }
+
     } catch (err) {
-      showMessage('Failed to load data', 'error');
+      console.error('Fetch error:', err);
+      showMessage(err.message || 'Failed to load data', 'error');
+      // Set empty state on error
+      setLeaves([]);
+      setStats({ totalLeaves: 0, pending: 0, approved: 0, rejected: 0 });
     } finally {
       setLoading(false);
     }
   }, [token]);
 
-  // Load only once on mount
+  // Load data on component mount
   useEffect(() => {
-    if (token) {
-      fetchData();
-    }
-  }, [token, fetchData]); // fetchData is stable thanks to useCallback
+    fetchData();
+  }, [fetchData]);
 
-  // Update status
+  // Update leave status
   const updateStatus = async (id, status) => {
     setActionLoading(id);
     try {
@@ -94,13 +135,30 @@ export default function AdminLeaveDashboard() {
 
       if (res.ok) {
         setLeaves(prev => prev.map(l => l._id === id ? { ...l, status } : l));
+        // Update stats locally
+        setStats(prev => {
+          const newStats = { ...prev };
+          const oldStatus = leaves.find(l => l._id === id)?.status;
+          if (oldStatus && oldStatus !== status) {
+            newStats[oldStatus] = Math.max(0, (newStats[oldStatus] || 0) - 1);
+            newStats[status] = (newStats[status] || 0) + 1;
+          }
+          return newStats;
+        });
         showMessage(`Leave ${status.toUpperCase()} successfully!`);
       } else {
-        const err = await res.json();
-        showMessage(err.message || 'Update failed', 'error');
+        const errorText = await res.text();
+        let errorMessage = `Update failed: ${res.status}`;
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.message || errorMessage;
+        } catch {
+          errorMessage = errorText || errorMessage;
+        }
+        showMessage(errorMessage, 'error');
       }
     } catch (err) {
-      showMessage('Network error', 'error');
+      showMessage('Network error: ' + err.message, 'error');
     } finally {
       setActionLoading('');
     }
@@ -109,45 +167,68 @@ export default function AdminLeaveDashboard() {
   // Delete leave
   const deleteLeave = async (id) => {
     if (!window.confirm('Permanently delete this leave request?')) return;
+
     setActionLoading(id);
     try {
       const res = await fetch(`${API_BASE}/admin/${id}`, {
         method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
       });
+
       if (res.ok) {
+        const deletedLeave = leaves.find(l => l._id === id);
         setLeaves(prev => prev.filter(l => l._id !== id));
+        // Update stats
+        if (deletedLeave) {
+          setStats(prev => ({
+            ...prev,
+            totalLeaves: Math.max(0, prev.totalLeaves - 1),
+            [deletedLeave.status]: Math.max(0, (prev[deletedLeave.status] || 0) - 1)
+          }));
+        }
         showMessage('Leave deleted permanently');
       } else {
-        showMessage('Delete failed', 'error');
+        const errorText = await res.text();
+        showMessage(errorText || 'Delete failed', 'error');
       }
     } catch (err) {
-      showMessage('Network error', 'error');
+      showMessage('Network error: ' + err.message, 'error');
     } finally {
       setActionLoading('');
     }
   };
 
+  // Filter leaves based on search and status
   const filteredLeaves = leaves.filter(leave => {
     const search = searchTerm.toLowerCase();
-    return (
-      (!search ||
-        leave.employeeName.toLowerCase().includes(search) ||
-        leave.employeeId.toLowerCase().includes(search) ||
-        leave.reason.toLowerCase().includes(search) ||
-        leave.leaveType.toLowerCase().includes(search)
-      ) &&
-      (statusFilter === 'all' || leave.status === statusFilter)
-    );
+    const matchesSearch = !searchTerm ||
+      leave.employeeName?.toLowerCase().includes(search) ||
+      leave.employeeId?.toLowerCase().includes(search) ||
+      leave.reason?.toLowerCase().includes(search) ||
+      leave.leaveType?.toLowerCase().includes(search);
+
+    const matchesStatus = statusFilter === 'all' || leave.status === statusFilter;
+
+    return matchesSearch && matchesStatus;
   });
 
+  // If no token, show access denied
   if (!token) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
-        <div className="bg-white p-12 rounded-3xl shadow-2xl text-center">
-          <AlertCircle className="w-20 h-20 text-red-500 mx-auto mb-6" />
-          <h1 className="text-4xl font-bold text-gray-800">Access Denied</h1>
-          <p className="text-xl text-gray-600 mt-4">Admin login required</p>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        <div className="bg-white p-8 rounded-2xl shadow-xl text-center max-w-md w-full">
+          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-gray-800 mb-2">Access Denied</h1>
+          <p className="text-gray-600 mb-4">Authentication required to access this page.</p>
+          <button
+            onClick={() => window.location.href = '/admin/login'}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition"
+          >
+            Go to Login
+          </button>
         </div>
       </div>
     );
@@ -206,7 +287,11 @@ export default function AdminLeaveDashboard() {
           <div className="p-5 border-b flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <h2 className="text-xl font-bold text-gray-800">All Leave Requests</h2>
             <div className="flex flex-col md:flex-row gap-3">
-              <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="px-4 py-2 text-sm border rounded-md">
+              <select
+                value={statusFilter}
+                onChange={e => setStatusFilter(e.target.value)}
+                className="px-4 py-2 text-sm border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
                 <option value="all">All Status</option>
                 <option value="pending">Pending</option>
                 <option value="approved">Approved</option>
@@ -219,11 +304,11 @@ export default function AdminLeaveDashboard() {
                   placeholder="Search employee, ID, reason..."
                   value={searchTerm}
                   onChange={e => setSearchTerm(e.target.value)}
-                  className="pl-10 pr-4 py-2 text-sm border rounded-md w-full md:w-64"
+                  className="pl-10 pr-4 py-2 text-sm border rounded-md w-full md:w-64 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
-              <button 
-                onClick={fetchData} 
+              <button
+                onClick={fetchData}
                 disabled={loading}
                 className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-4 py-2 rounded-md text-sm flex items-center gap-2 transition"
               >
@@ -242,7 +327,12 @@ export default function AdminLeaveDashboard() {
           ) : filteredLeaves.length === 0 ? (
             <div className="text-center py-16 text-gray-500">
               <Users className="w-20 h-20 mx-auto mb-4 text-gray-300" />
-              <p className="text-lg font-medium">No leave requests found</p>
+              <p className="text-lg font-medium">
+                {leaves.length === 0 ? 'No leave requests found' : 'No matching leave requests'}
+              </p>
+              {leaves.length > 0 && (
+                <p className="text-sm text-gray-400 mt-1">Try changing your search or filter</p>
+              )}
             </div>
           ) : (
             <div className="overflow-x-auto">
