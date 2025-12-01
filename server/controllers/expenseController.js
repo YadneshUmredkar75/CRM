@@ -30,9 +30,8 @@ export const submitExpense = catchAsync(async (req, res) => {
     return res.status(400).json({ success: false, message: "Inactive employees cannot submit expenses" });
   }
 
-  const receipt = req.file ? req.file.path : null; // Cloudinary URL
-
-  req.file.path
+  // Safe file extraction
+  const receipt = req.file?.path || null;
 
   const expense = await Expense.create({
     employeeId: req.employee._id,
@@ -52,6 +51,7 @@ export const submitExpense = catchAsync(async (req, res) => {
     data: expense,
   });
 });
+
 
 // 2. Get My Expenses (Employee)
 export const getMyExpenses = catchAsync(async (req, res) => {
