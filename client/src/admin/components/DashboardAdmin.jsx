@@ -123,18 +123,17 @@ const DashboardAdmin = () => {
 
   const menuItems = [
     { path: ".", label: "Dashboard", icon: DashboardIcon }, // Relative path
-    { path: "student-management", label: "Student Management", icon: StudentIcon },
     { path: "employees", label: "Employee Management", icon: EmployeeIcon },
+    { path: "student-management", label: "Student Management", icon: StudentIcon },
     { path: "monitoring-task", label: "Monitoring Task", icon: EmployeeIcon },
-
-    { path: "courses", label: "Course Management", icon: CourseIcon },
-    { path: "attendance", label: "Attendance", icon: AttendanceIcon },
+    { path: "employeeLiveStatus", label: "Employee Live Status", icon: IoLocationSharp },
     { path: "employeeLeaveStatus", label: "Leave Request", icon: GiExitDoor },
     { path: "project-management", label: "Project Management", icon: ProjectIcon },
-    { path: "employeeLiveStatus", label: "Employee Live Status", icon: IoLocationSharp },
     { path: "client-management", label: "Client Management", icon: ClientIcon },
     { path: "expense-management", label: "Expense Management", icon: PiCoins },
     { path: "leadinsensitivemanagement", label: "Lead Management", icon: LeadIcon },
+    { path: "courses", label: "Course Management", icon: CourseIcon },
+    { path: "attendance", label: "Attendance", icon: AttendanceIcon },
     { path: "reports", label: "Reports & Analytics", icon: ReportIcon },
     { path: "settings", label: "Settings", icon: SettingsIcon },
   ];
