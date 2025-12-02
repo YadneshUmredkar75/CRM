@@ -504,65 +504,82 @@ export const resetPassword = async (req, res) => {
 // ---------------------------------------------------------------------
 // CHANGE PASSWORD
 // ---------------------------------------------------------------------
+
+
 export const changePassword = async (req, res) => {
-  const { currentPassword, newPassword, confirmPassword } = req.body;
-
-  if (!currentPassword || !newPassword || !confirmPassword) {
-    return res.status(400).json({
-      success: false,
-      message: "All fields are required"
-    });
-  }
-
-  if (newPassword !== confirmPassword) {
-    return res.status(400).json({
-      success: false,
-      message: "New passwords do not match"
-    });
-  }
-
-  if (newPassword.length < 6) {
-    return res.status(400).json({
-      success: false,
-      message: "New password must be at least 6 characters"
-    });
-  }
-
   try {
-    // For demo purposes, get any employee or handle differently
-    const employee = await Employee.findOne();
+    const { currentPassword, newPassword, confirmPassword } = req.body;
+    const employeeId = req.user?.id; // employee logged in from token
+
+    // ---------------------- VALIDATION ----------------------
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "All fields are required."
+      });
+    }
+
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "New passwords do not match."
+      });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 6 characters long."
+      });
+    }
+
+    if (!employeeId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized request. Token missing."
+      });
+    }
+
+    // ---------------------- FIND EMPLOYEE ----------------------
+    const employee = await Employee.findById(employeeId);
+
     if (!employee) {
       return res.status(404).json({
         success: false,
-        message: "No employee found"
+        message: "Employee not found."
       });
     }
 
-    const decryptedCurrentPassword = decryptPassword(employee.password);
-    if (currentPassword !== decryptedCurrentPassword) {
+    // ---------------------- CHECK CURRENT PASSWORD ----------------------
+    const isMatched = await bcrypt.compare(currentPassword, employee.password);
+
+    if (!isMatched) {
       return res.status(401).json({
         success: false,
-        message: "Current password is incorrect"
+        message: "Current password is incorrect."
       });
     }
 
-    const encryptedNewPassword = encryptPassword(newPassword);
-    employee.password = encryptedNewPassword;
+    // ---------------------- UPDATE PASSWORD ----------------------
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    employee.password = hashedPassword;
     await employee.save();
 
-    res.json({
+    return res.status(200).json({
       success: true,
-      message: "Password changed successfully"
+      message: "Password updated successfully."
     });
-  } catch (err) {
-    console.error("Change password error:", err);
-    res.status(500).json({
+
+  } catch (error) {
+    console.error("Change Password Error:", error);
+    return res.status(500).json({
       success: false,
-      message: "Server error",
-      error: err.message
+      message: "Internal server error.",
+      error: error.message
     });
   }
 };
+
 
 // ---------------------------------------------------------------------
 // GET EMPLOYEE PASSWORD
@@ -974,24 +991,39 @@ export const getEmployeePerformance = async (req, res) => {
 // ---------------------------------------------------------------------
 export const getCurrentEmployee = async (req, res) => {
   try {
-    // For demo, get first employee or handle differently
-    const employee = await Employee.findOne().select('-password');
-    if (!employee) {
-      return res.status(404).json({
+    // Ensure authenticated user exists in request
+    const employeeId = req.employee?.id;
+
+    if (!employeeId) {
+      return res.status(401).json({
         success: false,
-        message: "No employee found"
+        message: "Unauthorized - Employee ID missing from token"
       });
     }
 
+    // Fetch employee excluding password
+    const employee = await Employee.findById(employeeId).select("-password");
+
+    if (!employee) {
+      return res.status(404).json({
+        success: false,
+        message: "Employee not found"
+      });
+    }
+
+    // Fetch tasks & attendance for this employee only
     const tasks = await Task.find({ employeeId: employee._id });
     const attendanceRecords = await Attendance.find({ employee: employee._id });
 
+    // Task analytics
     const completedTasks = tasks.filter(task =>
-      task.status === "Completed" || task.status === "completed"
+      ["Completed", "completed"].includes(task.status)
     ).length;
-    const taskCompletionRate = tasks.length > 0 ?
-      Math.round((completedTasks / tasks.length) * 100) : 0;
 
+    const taskCompletionRate =
+      tasks.length > 0 ? Math.round((completedTasks / tasks.length) * 100) : 0;
+
+    // Attendance analytics
     const totalDaysAttended = await Attendance.countDocuments({
       employee: employee._id,
       clockIn: { $exists: true },
@@ -1000,22 +1032,25 @@ export const getCurrentEmployee = async (req, res) => {
 
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
     const currentMonthAttendance = await Attendance.countDocuments({
       employee: employee._id,
       date: { $gte: startOfMonth },
       status: "Present"
     });
 
+    // Fetch recent tasks and attendance
     const recentTasks = await Task.find({ employeeId: employee._id })
       .sort({ createdAt: -1 })
       .limit(5)
-      .select('title status priority dueDate createdAt');
+      .select("title status priority dueDate createdAt");
 
     const recentAttendance = await Attendance.find({ employee: employee._id })
       .sort({ date: -1 })
       .limit(7)
-      .select('date clockIn clockOut status workingHours');
+      .select("date clockIn clockOut status workingHours");
 
+    // Preparing response payload
     const employeeData = {
       _id: employee._id,
       id: employee._id,
@@ -1032,15 +1067,14 @@ export const getCurrentEmployee = async (req, res) => {
       paidSalary: employee.paidSalary,
       joiningDate: employee.joiningDate,
       performance: employee.performance,
-      attendance: employee.attendance,
       createdAt: employee.createdAt,
       updatedAt: employee.updatedAt,
 
       stats: {
-        taskCompletionRate,
         totalTasks: tasks.length,
         completedTasks,
         pendingTasks: tasks.length - completedTasks,
+        taskCompletionRate,
         totalDaysAttended,
         currentMonthAttendance,
         attendancePercentage: Math.round((currentMonthAttendance / 22) * 100),
@@ -1053,7 +1087,7 @@ export const getCurrentEmployee = async (req, res) => {
       }
     };
 
-    res.json({
+    return res.status(200).json({
       success: true,
       message: "Employee data retrieved successfully",
       employee: employeeData
@@ -1061,6 +1095,7 @@ export const getCurrentEmployee = async (req, res) => {
 
   } catch (error) {
     console.error("Get current employee error:", error);
+
     res.status(500).json({
       success: false,
       message: "Server error while fetching employee data",
@@ -1069,65 +1104,102 @@ export const getCurrentEmployee = async (req, res) => {
   }
 };
 
+
 // ---------------------------------------------------------------------
 // UPDATE PROFILE
 // ---------------------------------------------------------------------
 export const updateProfile = async (req, res) => {
   try {
     const { name, email, phone, department, position } = req.body;
+    const employeeId = req.user?.id;
 
-    if (!name || name.toString().trim() === "") {
-      return res.status(400).json({ success: false, message: "Name is required" });
-    }
-    if (!email || email.toString().trim() === "") {
-      return res.status(400).json({ success: false, message: "Email is required" });
-    }
-    if (!/^[\w.-]+@[\w.-]+\.\w+$/.test(email.toString().trim())) {
-      return res.status(400).json({ success: false, message: "Invalid email format" });
+    // ----------- AUTH CHECK -----------
+    if (!employeeId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized request"
+      });
     }
 
-    // For demo, update first employee or handle differently
-    const employee = await Employee.findOne();
+    // ----------- REQUIRED FIELDS VALIDATION -----------
+    if (!name?.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Name is required"
+      });
+    }
+
+    if (!email?.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required"
+      });
+    }
+
+    const formattedEmail = email.trim().toLowerCase();
+
+    if (!/^[\w.-]+@[\w.-]+\.\w+$/.test(formattedEmail)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid email format"
+      });
+    }
+
+    // ----------- FIND EMPLOYEE -----------
+    const employee = await Employee.findById(employeeId);
+
     if (!employee) {
-      return res.status(404).json({ success: false, message: "Employee not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Employee not found"
+      });
     }
 
-    const newEmail = email.toString().trim().toLowerCase();
+    // ----------- UNIQUE EMAIL CHECK -----------
+    if (formattedEmail !== employee.email.toLowerCase()) {
+      const exists = await Employee.findOne({
+        email: formattedEmail,
+        _id: { $ne: employeeId }
+      });
 
-    if (newEmail !== employee.email.toLowerCase()) {
-      const exists = await Employee.findOne({ email: newEmail, _id: { $ne: employee._id } });
       if (exists) {
-        return res.status(400).json({ success: false, message: "Email already in use" });
+        return res.status(400).json({
+          success: false,
+          message: "Email already in use"
+        });
       }
     }
 
-    const updates = {
-      name: name.toString().trim(),
-      email: newEmail,
-      updatedAt: new Date(),
+    // ----------- UPDATE DATA -----------
+    const updatedData = {
+      name: name.trim(),
+      email: formattedEmail,
+      updatedAt: new Date()
     };
 
-    if (phone !== undefined) updates.phone = phone.toString().trim();
-    if (department?.toString().trim()) updates.department = department.toString().trim();
-    if (position?.toString().trim()) updates.position = position.toString().trim();
+    if (phone?.trim()) updatedData.phone = phone.trim();
+    if (department?.trim()) updatedData.department = department.trim();
+    if (position?.trim()) updatedData.position = position.trim();
 
     const updatedEmployee = await Employee.findByIdAndUpdate(
-      employee._id,
-      { $set: updates },
+      employeeId,
+      { $set: updatedData },
       { new: true, runValidators: true }
     ).select("-password");
 
-    const tasks = await Task.find({ employeeId: employee._id });
+    // ----------- STATS REBUILDING -----------
+    const tasks = await Task.find({ employeeId });
     const completedTasks = tasks.filter(t => ["Completed", "completed"].includes(t.status)).length;
     const taskCompletionRate = tasks.length > 0 ? Math.round((completedTasks / tasks.length) * 100) : 0;
 
     const totalDaysAttended = await Attendance.countDocuments({
-      employee: employee._id,
+      employee: employeeId,
       clockIn: { $exists: true },
-      clockOut: { $exists: true },
+      clockOut: { $exists: true }
     });
 
-    return res.json({
+    // ----------- SUCCESS RESPONSE -----------
+    return res.status(200).json({
       success: true,
       message: "Profile updated successfully",
       employee: {
@@ -1142,33 +1214,38 @@ export const updateProfile = async (req, res) => {
           totalTasks: tasks.length,
           completedTasks,
           taskCompletionRate,
-          totalDaysAttended,
-        },
-      },
+          totalDaysAttended
+        }
+      }
     });
 
   } catch (error) {
     console.error("UpdateProfile Error:", error);
 
+    // Duplicate email error
     if (error.code === 11000) {
       return res.status(400).json({
         success: false,
-        message: "Email already exists",
+        message: "Email already exists"
       });
     }
 
+    // Mongoose validation errors
     if (error.name === "ValidationError") {
-      const errors = Object.values(error.errors).map(e => e.message);
+      const messages = Object.values(error.errors).map(err => err.message);
       return res.status(400).json({
         success: false,
         message: "Validation failed",
-        errors,
+        errors: messages
       });
     }
 
+    // Fallback
     return res.status(500).json({
       success: false,
-      message: error.message || "Server error. Please try again later.",
+      message: "Server error. Please try again later.",
+      error: error.message
     });
   }
 };
+

@@ -60,21 +60,9 @@ const AdminLogin = () => {
         <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-8">
           {/* Header */}
           <div className="text-center mb-8">
-            <div className="w-20 h-20 bg-gradient-to-br from-purple-600 to-pink-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg">
-              <svg
-                className="w-10 h-10 text-white"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 4.354a4 4 0 110 5.292M15 21H9v-1c0-1.105.895-2 2-2h2c1.105 0 2 .895 2 2v1zm3-17h-2a2 2 0 00-2 2v2h6V9a2 2 0 00-2-2zm-6 0H6a2 2 0 00-2 2v2h6V9a2 2 0 00-2-2z"
-                />
-              </svg>
-            </div>
+          
+              <img src="/logo.jpg" alt="ssgroup" className="w-20 h-20 bg-gradient-to-br  rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg" />
+          
             <h2 className="text-3xl font-bold text-gray-800">Admin Portal</h2>
             <p className="text-gray-600 mt-2">Secure access to management dashboard</p>
           </div>
@@ -140,7 +128,7 @@ const AdminLogin = () => {
               className={`w-full py-3.5 px-4 rounded-lg font-semibold text-white shadow-md transition-all duration-200 flex items-center justify-center ${
                 loading
                   ? "bg-gray-400 cursor-not-allowed"
-                  : "bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 hover:shadow-lg transform hover:-translate-y-0.5"
+                : "bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 hover:shadow-lg transform hover:-translate-y-0.5"
               }`}
             >
               {loading ? (
@@ -174,7 +162,7 @@ const AdminLogin = () => {
           </form>
 
           {/* Demo Credentials */}
-          <div className="mt-8 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-purple-200">
+          {/* <div className="mt-8 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-purple-200">
             <h3 className="text-sm font-bold text-purple-900 mb-2">Demo Access</h3>
             <div className="text-xs text-purple-800 space-y-1">
               <p>
@@ -184,7 +172,7 @@ const AdminLogin = () => {
                 <span className="font-medium">Password:</span> admin123
               </p>
             </div>
-          </div>
+          </div> */}
 
           {/* Links */}
           <div className="mt-6 flex justify-between items-center text-sm">
@@ -194,9 +182,7 @@ const AdminLogin = () => {
             >
               Employee Login
             </Link>
-            <a href="#" className="text-gray-500 hover:text-gray-700">
-              Forgot Password?
-            </a>
+           
           </div>
 
           {/* Security Badge */}

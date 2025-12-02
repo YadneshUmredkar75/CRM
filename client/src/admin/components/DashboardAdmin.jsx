@@ -176,9 +176,9 @@ const DashboardAdmin = () => {
         <div className="p-6 flex items-center justify-between border-b border-blue-700">
           {sidebarOpen && (
             <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center">
-                <DashboardIcon className="w-5 h-5 text-blue-600" />
-              </div>
+              
+                <img src="/logo.jpg" alt="ssgroup" className="w-10 h-10 mt-4 bg-gradient-to-br  rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg" />
+              
               <h2 className="text-xl font-bold text-white">SS Group</h2>
             </div>
           )}

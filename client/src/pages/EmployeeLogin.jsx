@@ -87,21 +87,7 @@ useEffect(() => {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-100 flex items-center justify-center p-4">
       <div className="max-w-md w-full bg-white p-8 rounded-2xl shadow-lg border border-gray-200">
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg
-              className="w-8 h-8 text-white"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-              />
-            </svg>
-          </div>
+         <img src="/logo.jpg" alt="ssgroup" className="w-20 h-20 bg-gradient-to-br  rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg" />
           <h2 className="text-3xl font-bold text-gray-800">Employee Login</h2>
           <p className="text-gray-600 mt-2">Access your dashboard</p>
         </div>
@@ -222,7 +208,7 @@ useEffect(() => {
         </form>
 
         {/* Quick Login Buttons */}
-        <div className="mt-8">
+        {/* <div className="mt-8">
           <h3 className="text-sm font-semibold text-gray-700 mb-3 text-center">Quick Login</h3>
           <div className="grid grid-cols-2 gap-2">
             {quickLoginUsers.map((user, index) => (
@@ -235,7 +221,7 @@ useEffect(() => {
               </button>
             ))}
           </div>
-        </div>
+        </div> */}
 
         {/* Admin Login Link */}
         <div className="text-center mt-6 pt-6 border-t border-gray-200">

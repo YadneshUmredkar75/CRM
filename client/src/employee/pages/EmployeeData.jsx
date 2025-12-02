@@ -2,13 +2,12 @@
 import React, { useState, useEffect } from "react";
 import { formatInTimeZone } from "date-fns-tz";
 import {
-  Calendar, Clock, CheckCircle, AlertCircle, BarChart3,
-  User, Target, RefreshCw
+  Clock, CheckCircle, Target, Calendar, User, RefreshCw, AlertCircle, BarChart3, FileText
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 
 const IST = "Asia/Kolkata";
-const API_BASE_URL = "https://crm-c1y4.onrender.com"; // Confirm this
+const API_BASE_URL = "https://crm-c1y4.onrender.com";
 
 const EmployeeData = () => {
   const [attendance, setAttendance] = useState([]);
@@ -18,17 +17,12 @@ const EmployeeData = () => {
   const [error, setError] = useState("");
   const [currentTime, setCurrentTime] = useState("");
   const navigate = useNavigate();
+  const token = localStorage.getItem("employeeToken");
 
-  const token = localStorage.getItem('employeeToken');
-
-  // Redirect if no token
   useEffect(() => {
-    if (!token) {
-      navigate('/employee/login', { replace: true });
-    }
+    if (!token) navigate("/employee/login", { replace: true });
   }, [token, navigate]);
 
-  // Live Clock
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(formatInTimeZone(new Date(), IST, "h:mm:ss a"));
@@ -36,312 +30,264 @@ const EmployeeData = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // FETCH ALL DATA
   useEffect(() => {
-    const fetchDashboard = async () => {
+    const saved = localStorage.getItem("employeeData");
+    if (saved) setProfile(JSON.parse(saved));
+  }, []);
+
+  useEffect(() => {
+    const fetchData = async () => {
       if (!token) return;
-
       setLoading(true);
-      setError("");
-
-      const headers = {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      };
+      const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 
       try {
-        // Parallel API calls
         const [attRes, taskRes, profileRes] = await Promise.all([
-          fetch(`${API_BASE_URL}/attendance/history`, { headers }),
-          fetch(`${API_BASE_URL}/employee/task`, { headers }),
-          fetch(`${API_BASE_URL}/employee/profile`, { headers })
+          fetch(`${API_BASE_URL}/api/attendance/history`, { headers }).catch(() => ({ ok: false })),
+          fetch(`${API_BASE_URL}/api/employee/task`, { headers }).catch(() => ({ ok: false })),
+          fetch(`${API_BASE_URL}/api/employee/profile`, { headers }).catch(() => ({ ok: false })),
         ]);
 
-        // === ATTENDANCE ===
-        if (attRes.ok) {
-          const res = await attRes.json();
-          console.log("Attendance API:", res); // Debug
-          setAttendance(res.data || res.attendance || []);
-        } else {
-          console.error("Attendance failed:", attRes.status);
-          setAttendance([]);
-        }
-
-        // === TASKS ===
-        if (taskRes.ok) {
-          const res = await taskRes.json();
-          console.log("Tasks API:", res);
-          setTasks(res.data || res.tasks || []);
-        } else {
-          console.error("Tasks failed:", taskRes.status);
-          setTasks([]);
-        }
-
-        // === PROFILE ===
         if (profileRes.ok) {
           const res = await profileRes.json();
-          console.log("Profile API:", res);
           const emp = res.data || res.employee || {};
           setProfile(emp);
           localStorage.setItem("employeeData", JSON.stringify(emp));
-        } else {
-          console.error("Profile failed:", profileRes.status);
-          const stored = localStorage.getItem("employeeData");
-          if (stored) setProfile(JSON.parse(stored));
         }
-
+        if (attRes.ok) {
+          const res = await attRes.json();
+          setAttendance(res.data || res.attendance || []);
+        }
+        if (taskRes.ok) {
+          const res = await taskRes.json();
+          setTasks(res.data || res.tasks || []);
+        }
       } catch (err) {
-        console.error("Network error:", err);
-        setError("Server not responding. Check backend.");
+        setError("Offline mode: Showing cached data");
       } finally {
         setLoading(false);
       }
     };
-
-    fetchDashboard();
+    fetchData();
   }, [token]);
 
-  // RETRY
-  const handleRetry = () => window.location.reload();
-
-  // LOADING
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-96 bg-gray-50 rounded-2xl p-8">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Connecting to server...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // ERROR
-  if (error) {
-    return (
-      <div className="flex items-center justify-center min-h-96 bg-gray-50 rounded-2xl p-6">
-        <div className="text-center max-w-md">
-          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <p className="text-lg font-medium text-gray-800 mb-2">Connection Failed</p>
-          <p className="text-sm text-gray-600 mb-4">{error}</p>
-          <button onClick={handleRetry} className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition flex items-center gap-2 mx-auto">
-            <RefreshCw className="w-4 h-4" /> Retry
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // === TODAY FILTER (IST) ===
   const today = formatInTimeZone(new Date(), IST, "yyyy-MM-dd");
   const todayRecords = attendance.filter(r => {
-    if (!r.date) return false;
     try {
-      const recDate = formatInTimeZone(new Date(r.date), IST, "yyyy-MM-dd");
-      return recDate === today;
-    } catch {
-      return false;
-    }
+      return formatInTimeZone(new Date(r.date || r.createdAt), IST, "yyyy-MM-dd") === today;
+    } catch { return false; }
   });
 
-  // === HOURS TODAY ===
   const totalMinsToday = todayRecords.reduce((acc, r) => {
     if (r.clockIn && r.clockOut) {
-      const diff = (new Date(r.clockOut) - new Date(r.clockIn)) / 60000;
-      return acc + Math.floor(diff);
+      return acc + Math.floor((new Date(r.clockOut) - new Date(r.clockIn)) / 60000);
     }
     return acc;
   }, 0);
   const hoursToday = Math.floor(totalMinsToday / 60);
   const minsToday = totalMinsToday % 60;
 
-  // === MONTHLY HOURS ===
-  const monthlyMins = attendance.reduce((acc, r) => {
-    if (r.clockIn && r.clockOut) {
-      const diff = (new Date(r.clockOut) - new Date(r.clockIn)) / 60000;
-      return acc + Math.floor(diff);
-    }
-    return acc;
-  }, 0);
-  const totalHoursMonth = Math.floor(monthlyMins / 60);
-
-  // === TASKS ===
   const totalTasks = tasks.length;
   const completedTasks = tasks.filter(t => t.status === "completed" || t.progress === 100).length;
-  const avgProgress = totalTasks > 0
-    ? Math.round(tasks.reduce((acc, t) => acc + (t.progress || 0), 0) / totalTasks)
-    : 0;
+  const avgProgress = totalTasks > 0 ? Math.round(tasks.reduce((a, t) => a + (t.progress || 0), 0) / totalTasks) : 0;
 
-  // === PROFILE ===
-  const { name = "Employee", email, employeeId, _id, department = "N/A", position = "Employee" } = profile;
+  const name = profile.name || "Employee";
+  const email = profile.email || "N/A";
+  const employeeId = profile.employeeId || profile._id || "N/A";
+  const position = profile.position || "Employee";
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <RefreshCw className="w-12 h-12 text-blue-600 animate-spin mx-auto" />
+          <p className="mt-4 text-lg text-gray-700">Loading your dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-8">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4 md:p-6">
+      <div className="max-w-7xl mx-auto">
 
-      {/* Header */}
-      <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white p-8 rounded-2xl shadow-lg">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold flex items-center gap-3">
-              <User className="w-8 h-8" />
-              Welcome back, {name.split(" ")[0]}!
-            </h1>
-            <p className="text-purple-100 mt-1">{email}</p>
-            <p className="text-purple-200 text-sm mt-1">
-              Employee ID: {employeeId || _id || "N/A"}
-            </p>
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h1 className="text-3xl md:text-4xl font-bold text-gray-800">Employee Dashboard</h1>
+          <p className="text-gray-600 mt-1">Welcome back, {name.split(" ")[0]}!</p>
+        </div>
+
+        {/* Offline Message */}
+        {error && (
+          <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-lg mb-6 text-center">
+            {error}
           </div>
-          <div className="text-right">
-            <p className="text-sm opacity-90">Today</p>
-            <p className="text-2xl font-bold">
-              {formatInTimeZone(new Date(), IST, "EEEE, MMM d, yyyy")}
-            </p>
-            <p className="text-lg opacity-90 flex items-center justify-end gap-1 mt-1">
-              <Clock className="w-5 h-5" />
-              {currentTime} IST
-            </p>
+        )}
+
+        {/* Profile Card */}
+        <div className="bg-white rounded-xl shadow-lg p-6 mb-8 border-l-4 border-blue-500">
+          <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
+            <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-lg">
+              {name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase()}
+            </div>
+            <div className="text-center md:text-left flex-1">
+              <h2 className="text-2xl font-bold text-gray-800">{name}</h2>
+              <p className="text-gray-600">{position}</p>
+              <p className="text-sm text-gray-500 mt-1">ID: {employeeId} • {email}</p>
+            </div>
+            <div className="bg-blue-50 px-6 py-4 rounded-xl text-center">
+              <p className="text-xs text-gray-600">Current Time (IST)</p>
+              <p className="text-2xl font-bold text-blue-700 mt-1">{currentTime}</p>
+              <p className="text-sm text-gray-600 mt-1">
+                {formatInTimeZone(new Date(), IST, "EEEE, dd MMM yyyy")}
+              </p>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        <StatCard
-          icon={Clock}
-          title="Hours Today"
-          value={`${hoursToday}h ${minsToday}m`}
-          color="from-green-500 to-emerald-600"
-          trend={todayRecords.length > 0 ? `${todayRecords.length} session(s)` : "Not clocked in"}
-        />
-        <StatCard
-          icon={Calendar}
-          title="Monthly Hours"
-          value={`${totalHoursMonth}h`}
-          color="from-blue-500 to-indigo-600"
-          trend={`${attendance.length} days`}
-        />
-        <StatCard
-          icon={Target}
-          title="Tasks"
-          value={`${completedTasks}/${totalTasks}`}
-          color="from-purple-500 to-pink-600"
-          trend={`${avgProgress}% progress`}
-        />
-      </div>
-
-      {/* Attendance + Tasks */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-        <div className="bg-white rounded-2xl shadow-lg p-6 border">
-          <h3 className="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
-            <BarChart3 className="w-6 h-6 text-purple-600" />
-            Today's Attendance
-          </h3>
-          {todayRecords.length === 0 ? (
-            <div className="text-center py-8">
-              <Clock className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-              <p className="text-gray-500">No records yet</p>
-              <p className="text-sm text-gray-400 mt-1">Click below to clock in</p>
+        {/* Stats Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
+          {[
+            { label: "Hours Today", value: `${hoursToday}h ${minsToday}m`, icon: Clock, color: "blue" },
+            { label: "Tasks Completed", value: `${completedTasks}/${totalTasks}`, icon: CheckCircle, color: "green" },
+            { label: "Task Progress", value: `${avgProgress}%`, icon: Target, color: "purple" },
+            { label: "Attendance Today", value: todayRecords.length > 0 ? "Present" : "Not Clocked", icon: Calendar, color: "yellow" },
+          ].map((stat, i) => (
+            <div key={i} className="bg-white rounded-xl shadow p-5 border-l-4" style={{
+              borderLeftColor: i === 0 ? "#3B82F6" : i === 1 ? "#10B981" : i === 2 ? "#8B5CF6" : "#F59E0B"
+            }}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-gray-600">{stat.label}</p>
+                  <p className="text-2xl md:text-3xl font-bold text-gray-800">{stat.value}</p>
+                </div>
+                <div className={`p-3 rounded-full ${i === 0 ? 'bg-blue-100' : i === 1 ? 'bg-green-100' : i === 2 ? 'bg-purple-100' : 'bg-yellow-100'}`}>
+                  <stat.icon className={`w-6 h-6 ${i === 0 ? 'text-blue-600' : i === 1 ? 'text-green-600' : i === 2 ? 'text-purple-600' : 'text-yellow-600'}`} />
+                </div>
+              </div>
             </div>
-          ) : (
-            <div className="space-y-3">
-              {todayRecords.map((r, i) => (
-                <div key={i} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                  <div>
-                    <p className="font-medium">
-                      {r.clockIn ? new Date(r.clockIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "—"}
-                      {" → "}
-                      {r.clockOut ? new Date(r.clockOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "—"}
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      {r.clockOut ? `${Math.floor((new Date(r.clockOut) - new Date(r.clockIn)) / 60000)} mins` : "Active"}
-                    </p>
+          ))}
+        </div>
+
+        {/* Attendance & Tasks Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+          {/* Today's Attendance */}
+          <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+            <div className="bg-gray-50 px-6 py-4 border-b">
+              <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                <BarChart3 className="w-5 h-5 text-blue-600" />
+                Today's Attendance
+              </h3>
+            </div>
+            <div className="p-6">
+              {todayRecords.length === 0 ? (
+                <div className="text-center py-12">
+                  <Clock className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-600 text-lg">No clock-in recorded today</p>
+                  <Link to="/employee/dashboard/attendance" className="mt-4 inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium">
+                    Clock In Now
+                  </Link>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {todayRecords.map((r, i) => (
+                    <div key={i} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border">
+                      <div>
+                        <p className="font-medium text-gray-800">
+                          {r.clockIn ? new Date(r.clockIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "—"}
+                          → {r.clockOut ? new Date(r.clockOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Active"}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          {r.clockOut ? `${Math.floor((new Date(r.clockOut) - new Date(r.clockIn)) / 60000)} mins` : "Currently clocked in"}
+                        </p>
+                      </div>
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${r.clockOut ? "bg-green-100 text-green-700" : "bg-blue-100 text-blue-700"}`}>
+                        {r.clockOut ? "Completed" : "Active"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Task Progress */}
+          <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+            <div className="bg-gray-50 px-6 py-4 border-b">
+              <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                <Target className="w-5 h-5 text-purple-600" />
+                Task Progress
+              </h3>
+            </div>
+            <div className="p-6">
+              {totalTasks === 0 ? (
+                <div className="text-center py-12">
+                  <Target className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-600 text-lg">No tasks assigned</p>
+                </div>
+              ) : (
+                <>
+                  <div className="mb-6">
+                    <div className="flex justify-between text-sm mb-2">
+                      <span className="text-gray-700">Overall Progress</span>
+                      <span className="font-bold text-purple-600">{avgProgress}%</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-4">
+                      <div className="bg-gradient-to-r from-purple-500 to-pink-500 h-4 rounded-full transition-all" style={{ width: `${avgProgress}%` }} />
+                    </div>
                   </div>
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${r.clockOut ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>
-                    {r.clockOut ? "Done" : "Live"}
-                  </span>
-                </div>
-              ))}
+                  <div className="grid grid-cols-3 gap-4 text-center">
+                    <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                      <p className="text-2xl font-bold text-green-600">{completedTasks}</p>
+                      <p className="text-xs text-gray-600">Completed</p>
+                    </div>
+                    <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                      <p className="text-2xl font-bold text-yellow-600">{totalTasks - completedTasks}</p>
+                      <p className="text-xs text-gray-600">Pending</p>
+                    </div>
+                    <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                      <p className="text-2xl font-bold text-blue-600">{totalTasks}</p>
+                      <p className="text-xs text-gray-600">Total</p>
+                    </div>
+                  </div>
+                </>
+              )}
+              <Link to="/employee/dashboard/task" className="mt-6 block text-center px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-medium">
+                View All Tasks
+              </Link>
             </div>
-          )}
-          <Link to="/employee/dashboard/attendance" className="mt-4 inline-block text-purple-600 hover:underline text-sm font-medium">
-            View Full Log
-          </Link>
+          </div>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-lg p-6 border">
-          <h3 className="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
-            <CheckCircle className="w-6 h-6 text-green-600" />
-            Task Progress
-          </h3>
-          {totalTasks === 0 ? (
-            <div className="text-center py-8">
-              <Target className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-              <p className="text-gray-500">No tasks assigned</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div>
-                <div className="flex justify-between text-sm mb-1">
-                  <span>Overall</span>
-                  <span className="font-bold">{avgProgress}%</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-3">
-                  <div className="bg-gradient-to-r from-purple-500 to-pink-500 h-3 rounded-full transition-all" style={{ width: `${avgProgress}%` }} />
-                </div>
-              </div>
-              <div className="grid grid-cols-3 gap-3 text-center">
-                <div className="p-3 bg-green-50 rounded-lg border border-green-200">
-                  <p className="text-2xl font-bold text-green-600">{completedTasks}</p>
-                  <p className="text-xs text-gray-600">Done</p>
-                </div>
-                <div className="p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-                  <p className="text-2xl font-bold text-yellow-600">{totalTasks - completedTasks}</p>
-                  <p className="text-xs text-gray-600">Pending</p>
-                </div>
-                <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                  <p className="text-2xl font-bold text-blue-600">{totalTasks}</p>
-                  <p className="text-xs text-gray-600">Total</p>
-                </div>
-              </div>
-            </div>
-          )}
-          <Link to="/employee/dashboard/task" className="mt-4 inline-block text-purple-600 hover:underline text-sm font-medium">
-            View All Tasks
-          </Link>
+        {/* Quick Actions */}
+        <div className="bg-white rounded-xl shadow-lg p-6">
+          <h3 className="text-xl font-bold text-gray-800 mb-6">Quick Actions</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[
+              { to: "/employee/dashboard/attendance", icon: Clock, label: "Attendance", color: "blue" },
+              { to: "/employee/dashboard/task", icon: Target, label: "My Tasks", color: "purple" },
+              { to: "/employee/dashboard/leaverequest", icon: FileText, label: "Leave Request", color: "yellow" },
+              { to: "/employee/dashboard/settings", icon: User, label: "Profile", color: "green" },
+            ].map((btn, i) => (
+              <Link
+                key={i}
+                to={btn.to}
+                className={`p-6 rounded-xl text-white font-medium text-center transition transform hover:scale-105 hover:shadow-lg ${
+                  btn.color === "blue" ? "bg-blue-600 hover:bg-blue-700" :
+                  btn.color === "purple" ? "bg-purple-600 hover:bg-purple-700" :
+                  btn.color === "yellow" ? "bg-yellow-600 hover:bg-yellow-700" :
+                  "bg-green-600 hover:bg-green-700"
+                }`}
+              >
+                <btn.icon className="w-10 h-10 mx-auto mb-2" />
+                {btn.label}
+              </Link>
+            ))}
+          </div>
         </div>
-      </div>
-
-      {/* Quick Actions */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <ActionButton to="/employee/dashboard/attendance" icon={Clock} label="Clock In/Out" color="bg-green-500 hover:bg-green-600" />
-        <ActionButton to="/employee/dashboard/task" icon={Target} label="My Tasks" color="bg-purple-500 hover:bg-purple-600" />
-        <ActionButton to="/employee/dashboard/studentform" icon={Calendar} label="Request Leave" color="bg-blue-500 hover:bg-blue-600" />
-        <ActionButton to="/employee/dashboard/settings" icon={User} label="Profile" color="bg-gray-600 hover:bg-gray-700" />
       </div>
     </div>
   );
 };
-
-// Components
-const StatCard = ({ icon: Icon, title, value, color, trend }) => (
-  <div className="bg-white rounded-2xl shadow-md p-6 border hover:shadow-lg transition-shadow">
-    <div className="flex items-center justify-between mb-3">
-      <div className={`p-3 rounded-xl bg-gradient-to-r ${color} text-white`}>
-        <Icon className="w-6 h-6" />
-      </div>
-    </div>
-    <p className="text-sm text-gray-600">{title}</p>
-    <p className="text-2xl font-bold text-gray-800 mt-1">{value}</p>
-    <p className="text-xs text-gray-500 mt-2">{trend}</p>
-  </div>
-);
-
-const ActionButton = ({ to, icon: Icon, label, color }) => (
-  <Link to={to} className={`${color} text-white p-4 rounded-xl flex flex-col items-center justify-center gap-2 hover:shadow-lg transition-all transform hover:-translate-y-1`}>
-    <Icon className="w-6 h-6" />
-    <span className="text-sm font-medium">{label}</span>
-  </Link>
-);
 
 export default EmployeeData;

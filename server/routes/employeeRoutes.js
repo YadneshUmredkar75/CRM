@@ -6,16 +6,16 @@ import {
   getTasks, addTask, updateTask, deleteTask, getEmployeeTasks, getEmployeeAttendance, getEmployeePerformance,
   getEmployeeById, getCurrentEmployee, updateProfile,
 } from "../controllers/employeeController.js";
-
+import { protectEmployee } from "../middleware/authEmployee.js";
 const router = Router();
 
 // PUBLIC ROUTES - NO PROTECTION
 router.post("/login", login);
 
 // EMPLOYEE ROUTES - NO PROTECTION
-router.get("/me", getCurrentEmployee);
-router.patch("/me/change-password", changePassword);
-router.patch("/update-profile", updateProfile);
+router.get("/me",protectEmployee, getCurrentEmployee);
+router.patch("/me/change-password",protectEmployee, changePassword);
+router.patch("/update-profile",protectEmployee, updateProfile);
 router.get("/task", getTasks);
 router.post("/task", addTask);
 router.patch("/task/:id", updateTask);

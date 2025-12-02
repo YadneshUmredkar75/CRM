@@ -485,7 +485,7 @@ const TaskAdmin = () => {
                             {/* Notes */}
                             {selectedTask.notes && (
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 flex items-center">
+                                    <label className=" text-sm font-medium text-gray-700 flex items-center">
                                         <MessageSquare className="w-4 h-4 mr-1" />
                                         Notes
                                     </label>
