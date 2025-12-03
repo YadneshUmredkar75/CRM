@@ -27,7 +27,6 @@ import {
 import { SiGoogletasks, SiGoogleforms } from "react-icons/si";
 import { BsQrCodeScan } from "react-icons/bs";
 import { FiSettings } from "react-icons/fi";
-// import LeadManagement from "../pages/LeadManagement";
 
 // Pages
 import EmployeeAttendance from "../pages/EmployeeAttendance";
@@ -167,9 +166,13 @@ const DashboardContent = () => {
       {/* Welcome */}
       <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl p-6 text-white">
         <h1 className="text-3xl font-bold mb-2">Welcome back, {employee?.name?.split(" ")[0] || "Employee"}!</h1>
-        <p className="text-purple-100">Here's your dashboard overview for today.</p>
+        <p className="text-purple-100">
+          {employee?.employeeType === "Intern" 
+            ? "Intern Dashboard - Limited Access Mode" 
+            : "Here's your dashboard overview for today."}
+        </p>
         <div className="flex flex-wrap gap-4 mt-4">
-          {["Position", "Department", "Status"].map((label, i) => (
+          {["Position", "Department", "Status", "Type"].map((label, i) => (
             <div key={i} className="bg-white/20 backdrop-blur-sm rounded-lg px-4 py-2">
               <p className="text-sm opacity-90">{label}</p>
               <p className="font-semibold">
@@ -178,6 +181,7 @@ const DashboardContent = () => {
                     : employee?.department === 2 ? "Marketing"
                       : employee?.department === 3 ? "Development" : "Other"
                   : label === "Status" ? employee?.status || "Active"
+                  : label === "Type" ? employee?.employeeType || "Employee"
                     : employee?.position || "Employee"}
               </p>
             </div>
@@ -185,11 +189,13 @@ const DashboardContent = () => {
         </div>
       </div>
 
-      {/* Quick Actions */}
+      {/* Quick Actions - Hide clock in/out for interns if needed */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {[
-          { action: "clockIn", label: "Clock In", color: "green", icon: <FaUserClock /> },
-          { action: "clockOut", label: "Clock Out", color: "red", icon: <FaUserClock /> },
+          ...(employee?.employeeType !== "Intern" ? [
+            { action: "clockIn", label: "Clock In", color: "green", icon: <FaUserClock /> },
+            { action: "clockOut", label: "Clock Out", color: "red", icon: <FaUserClock /> },
+          ] : []),
           { to: "/employee/dashboard/task", label: "My Tasks", color: "blue", icon: <FaTasks /> },
           { to: "/employee/dashboard/attendance", label: "Attendance", color: "purple", icon: <RiCalendarScheduleLine /> },
         ].map((btn, i) => (
@@ -323,31 +329,104 @@ const DashboardEmployee = () => {
     navigate("/employee/login", { replace: true });
   };
 
-  const menuItems = [
+  // Define all possible menu items
+  const allMenuItems = [
     { path: "/employee/dashboard", label: "Dashboard", icon: <RiDashboardHorizontalFill /> },
     { path: "/employee/dashboard/students", label: "Students Attendance", icon: <FaUserGraduate /> },
     { path: "/employee/dashboard/courses", label: "Course Management", icon: <FaFileSignature /> },
     { path: "/employee/dashboard/attendance", label: "My Attendance", icon: <FaBusinessTime /> },
     { path: "/employee/dashboard/QRstudentattendance", label: "Student QR Attendance", icon: <BsQrCodeScan /> },
     { path: "/employee/dashboard/leaverequest", label: "Leave Request", icon: <SiGoogleforms /> },
-    { path: "/employee/dashboard/leadmanagement", label: "LeadManagement", icon: <FaUserPlus /> },
+    { path: "/employee/dashboard/leadmanagement", label: "Lead Management", icon: <FaUserPlus /> },
     { path: "/employee/dashboard/task", label: "My Tasks", icon: <SiGoogletasks /> },
-    // { path: "/employee/dashboard/leaverequest", label: "Leave Request", icon: <FaFileSignature /> },
     { path: "/employee/dashboard/expense", label: "Expense", icon: <FaMoneyBillWave /> },
     { path: "/employee/dashboard/settings", label: "Settings", icon: <FiSettings /> },
   ];
+
+  // Filter menu items based on employeeType
+  const getFilteredMenuItems = () => {
+    if (!employee) return allMenuItems;
+    
+    // If employeeType is "Intern", only show specific routes
+    if (employee.employeeType === "Intern") {
+      return allMenuItems.filter(item => {
+        const allowedRoutes = [
+          "/employee/dashboard", // Dashboard
+          "/employee/dashboard/attendance", // My Attendance
+          "/employee/dashboard/leaverequest", // Leave Request
+          "/employee/dashboard/leadmanagement", // Lead Management (if interns need this)
+          "/employee/dashboard/expense", // Expense
+          "/employee/dashboard/task", // My Tasks
+          "/employee/dashboard/settings", // Settings
+        ];
+        return allowedRoutes.includes(item.path);
+      });
+    }
+    
+    // For other employee types (Full-time, Part-time, etc.), show all routes
+    return allMenuItems;
+  };
+
+  const menuItems = getFilteredMenuItems();
+
+  // Check if current route is allowed for the employee
+  const isRouteAllowed = (path) => {
+    if (!employee) return true;
+    
+    if (employee.employeeType === "Intern") {
+      const allowedRoutes = [
+        "/employee/dashboard",
+        "/employee/dashboard/attendance",
+        "/employee/dashboard/leaverequest",
+        "/employee/dashboard/leadmanagement",
+        "/employee/dashboard/expense",
+        "/employee/dashboard/task",
+        "/employee/dashboard/settings",
+      ];
+      
+      // Handle nested routes
+      if (path.startsWith("/employee/dashboard")) {
+        return allowedRoutes.some(allowedPath => 
+          path === allowedPath || path.startsWith(allowedPath + "/")
+        );
+      }
+      
+      return allowedRoutes.includes(path);
+    }
+    
+    return true; // All routes allowed for non-interns
+  };
+
+  // Redirect if trying to access unauthorized route
+  useEffect(() => {
+    if (employee && !isRouteAllowed(location.pathname)) {
+      navigate("/employee/dashboard", { replace: true });
+    }
+  }, [location.pathname, employee, navigate]);
 
   // Check authentication and redirect if needed
   if (!localStorage.getItem("employeeToken")) {
     return <Navigate to="/employee/login" replace />;
   }
 
+  // Show unauthorized message if intern tries to access restricted pages
+  const isIntern = employee?.employeeType === "Intern";
+  const currentRoute = menuItems.find(i => i.path === location.pathname);
+  const isRestrictedRoute = !currentRoute && location.pathname !== "/employee/dashboard";
+
   return (
     <div className="flex h-screen bg-gray-100">
       {/* Sidebar */}
       <aside className={`${sidebarOpen ? "w-64" : "w-20"} bg-gray-800 text-white transition-all duration-300 flex flex-col`}>
         <div className="p-4 flex items-center justify-between">
-          {sidebarOpen && <h2 className="text-xl font-bold">Employee Portal</h2>}
+          {sidebarOpen && (
+            <div>
+              <h2 className="text-xl font-bold">Employee Portal</h2>
+              {isIntern && (
+                <p className="text-xs text-yellow-300 mt-1">Intern Mode</p>
+              )}
+            </div>
+          )}
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
             className="p-2 rounded-lg hover:bg-gray-700 transition-colors text-xl"
@@ -372,16 +451,25 @@ const DashboardEmployee = () => {
 
         {sidebarOpen && employee && (
           <div className="p-4 border-t border-gray-700 bg-gray-900 text-sm">
-            <p className="font-semibold truncate">{employee.name}</p>
-            <p className="text-gray-400 text-xs truncate">{employee.position}</p>
-            <p className="text-gray-400 text-xs">
-              {employee.department === 1 ? "Sales" :
-                employee.department === 2 ? "Marketing" :
-                  employee.department === 3 ? "Development" : "Other"}
-            </p>
-            <p className={`text-xs mt-1 ${employee.status === "Active" ? "text-green-400" : "text-red-400"}`}>
-              ● {employee.status}
-            </p>
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="font-semibold truncate">{employee.name}</p>
+                <p className="text-gray-400 text-xs truncate">{employee.position}</p>
+                <p className="text-gray-400 text-xs">
+                  {employee.department === 1 ? "Sales" :
+                    employee.department === 2 ? "Marketing" :
+                      employee.department === 3 ? "Development" : "Other"}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className={`text-xs ${employee.status === "Active" ? "text-green-400" : "text-red-400"}`}>
+                  ● {employee.status}
+                </p>
+                <p className={`text-xs mt-1 ${employee.employeeType === "Intern" ? "text-yellow-400" : "text-blue-400"}`}>
+                  {employee.employeeType}
+                </p>
+              </div>
+            </div>
           </div>
         )}
       </aside>
@@ -390,14 +478,24 @@ const DashboardEmployee = () => {
       <div className="flex-1 flex flex-col overflow-hidden">
         <header className="bg-white shadow-sm border-b border-gray-200">
           <div className="flex items-center justify-between p-4">
-            <h1 className="text-2xl font-bold text-gray-800">
-              {menuItems.find(i => i.path === location.pathname)?.label || "Employee Dashboard"}
-            </h1>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-800">
+                {currentRoute?.label || "Employee Dashboard"}
+              </h1>
+              {isIntern && (
+                <p className="text-sm text-gray-500">Intern Access Mode</p>
+              )}
+            </div>
             <div className="flex items-center space-x-4">
               {employee && (
                 <div className="text-right">
                   <p className="text-gray-700 font-medium">{employee.name}</p>
-                  <p className="text-gray-500 text-sm">{employee.position}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-gray-500 text-sm">{employee.position}</p>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${employee.employeeType === "Intern" ? "bg-yellow-100 text-yellow-800" : "bg-blue-100 text-blue-800"}`}>
+                      {employee.employeeType}
+                    </span>
+                  </div>
                 </div>
               )}
               <button
@@ -411,21 +509,49 @@ const DashboardEmployee = () => {
         </header>
 
         <main className="flex-1 overflow-y-auto p-6 bg-gray-50">
-          <Routes>
-
-            <Route index element={<EmployeeData />} />
-            <Route path="leadmanagement" element={< LeadManagement />} />
-            <Route path="students" element={<StudentAttendance />} />
-            <Route path="courses" element={<CourseManagement />} />
-            <Route path="attendance" element={<EmployeeAttendance />} />
-            <Route path="task" element={<TaskTracker />} />
-            <Route path="QRstudentattendance" element={<QRStudentAttendance />} />
-            <Route path="studentform" element={<StudentForm />} />
-            <Route path="expense" element={<Expense />} />
-            <Route path="settings" element={<EmployeeSettings />} />
-            <Route path="leaverequest" element={<LeaveApplicationForm />} />
-            <Route path="*" element={<Navigate to="/employee/dashboard" replace />} />
-          </Routes>
+          {isRestrictedRoute ? (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
+              <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+              </div>
+              <h2 className="text-2xl font-bold text-gray-800 mb-2">Access Restricted</h2>
+              <p className="text-gray-600 mb-6">
+                As an intern, you don't have permission to access this page.
+              </p>
+              <Link
+                to="/employee/dashboard"
+                className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg transition-colors font-medium inline-block"
+              >
+                Go to Dashboard
+              </Link>
+            </div>
+          ) : (
+            <Routes>
+              <Route index element={<EmployeeData />} />
+              
+              {/* Only render these routes if employee is not an intern or if route is allowed */}
+              {!isIntern && (
+                <>
+                  <Route path="students" element={<StudentAttendance />} />
+                  <Route path="courses" element={<CourseManagement />} />
+                  <Route path="QRstudentattendance" element={<QRStudentAttendance />} />
+                </>
+              )}
+              
+              {/* Always render these routes (allowed for interns) */}
+              <Route path="attendance" element={<EmployeeAttendance />} />
+              <Route path="leaverequest" element={<LeaveApplicationForm />} />
+              <Route path="leadmanagement" element={<LeadManagement />} />
+              <Route path="task" element={<TaskTracker />} />
+              <Route path="expense" element={<Expense />} />
+              <Route path="settings" element={<EmployeeSettings />} />
+              
+              {/* Redirect any unauthorized routes */}
+              <Route path="*" element={<Navigate to="/employee/dashboard" replace />} />
+            </Routes>
+          )}
         </main>
       </div>
     </div>
