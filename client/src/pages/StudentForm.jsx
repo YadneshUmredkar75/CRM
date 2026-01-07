@@ -18,7 +18,8 @@ const StudentForm = () => {
     if (isSubmitting) return; // PREVENT DOUBLE CLICK
     setIsSubmitting(true); // DISABLE BUTTON
 
-    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyJIf0XyOxDkJV8loq5MNae7unSc9xwRfEDJ5kWZmt-GTUgfCdEEWVCxsiMpCt59hv4/exec";
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycby9PJdPKH3VCi0qCo8fHSyc69vklIyiq-VpY_M084e3EMkhFwQkdnSF9eIc6PUQgyKs/exec";
+    // const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyJIf0XyOxDkJV8loq5MNae7unSc9xwRfEDJ5kWZmt-GTUgfCdEEWVCxsiMpCt59hv4/exec";
 
     const body = new URLSearchParams();
     body.append("name", name.trim());

@@ -16,7 +16,7 @@ const QRStudentAttendance = () => {
     const formattedDate = getFormattedDate();
     setDate(formattedDate);
 
-    const formURL = `https://host-crm-gamma.vercel.app/student-form?date=${encodeURIComponent(
+    const formURL = `https://crm-seven-jade.vercel.app/student-form?date=${encodeURIComponent(
       formattedDate
     )}`;
     setQrValue(formURL);

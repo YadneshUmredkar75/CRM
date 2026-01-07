@@ -9,7 +9,7 @@ const StudentAttendance = () => {
   const [searchQuery, setSearchQuery] = useState("");
 
   // ---- Google Sheet Config ----
-  const SHEET_ID = "1O7hsQW3zZ75zziLvxTVGiVB5aA3ZGuQ2K97q5y2ICcE";
+  const SHEET_ID = "1W9Vs0fNDTvi9g3U8JOI2RVP_qor6YHTsmmxhjrDMPKY";
   const SHEET_NAME = "Attendance";
   const CSV_URL = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${SHEET_NAME}`;
 
