@@ -8,7 +8,7 @@ const ClientIcon = ({ className = "w-5 h-5" }) => (
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
   </svg>
 );
-   
+
 const EmailIcon = ({ className = "w-4 h-4" }) => (
   <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
@@ -65,7 +65,7 @@ const ClientManagement = () => {
     );
   }
 
-  const API_BASE = "https://crm-c1y4.onrender.com/api/clients";
+  const API_BASE = "https://crm-p35o.onrender.com/api/clients";
 
   const [clients, setClients] = useState([]);
   const [stats, setStats] = useState({ total: 0, active: 0, vip: 0, totalValue: 0, totalProjects: 0, avgProjects: 0 });
@@ -329,30 +329,30 @@ const ClientManagement = () => {
 
             <form onSubmit={handleAddClient} className="space-y-5">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <input required type="text" placeholder="Full Name" value={newClient.name} onChange={e => setNewClient({...newClient, name: e.target.value})} className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                <input required type="email" placeholder="Email" value={newClient.email} onChange={e => setNewClient({...newClient, email: e.target.value})} className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                <input required type="text" placeholder="Phone" value={newClient.phone} onChange={e => setNewClient({...newClient, phone: e.target.value})} className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                <input required type="text" placeholder="Company" value={newClient.company} onChange={e => setNewClient({...newClient, company: e.target.value})} className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                
-                <select value={newClient.industry} onChange={e => setNewClient({...newClient, industry: e.target.value})} className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <input required type="text" placeholder="Full Name" value={newClient.name} onChange={e => setNewClient({ ...newClient, name: e.target.value })} className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                <input required type="email" placeholder="Email" value={newClient.email} onChange={e => setNewClient({ ...newClient, email: e.target.value })} className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                <input required type="text" placeholder="Phone" value={newClient.phone} onChange={e => setNewClient({ ...newClient, phone: e.target.value })} className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                <input required type="text" placeholder="Company" value={newClient.company} onChange={e => setNewClient({ ...newClient, company: e.target.value })} className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+
+                <select value={newClient.industry} onChange={e => setNewClient({ ...newClient, industry: e.target.value })} className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                   <option value="">Select Industry</option>
                   {industries.map(ind => <option key={ind} value={ind}>{ind}</option>)}
                 </select>
 
-                <select value={newClient.status} onChange={e => setNewClient({...newClient, status: e.target.value})} className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <select value={newClient.status} onChange={e => setNewClient({ ...newClient, status: e.target.value })} className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                   {statuses.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
 
-                <input type="number" placeholder="Project Value (₹)" value={newClient.value} onChange={e => setNewClient({...newClient, value: e.target.value})} className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                <input type="number" placeholder="Total Projects" value={newClient.projects} onChange={e => setNewClient({...newClient, projects: e.target.value})} className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                <input type="number" placeholder="Project Value (₹)" value={newClient.value} onChange={e => setNewClient({ ...newClient, value: e.target.value })} className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                <input type="number" placeholder="Total Projects" value={newClient.projects} onChange={e => setNewClient({ ...newClient, projects: e.target.value })} className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <input type="date" value={newClient.lastContact} onChange={e => setNewClient({...newClient, lastContact: e.target.value})} className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                <input type="date" value={newClient.lastContact} onChange={e => setNewClient({ ...newClient, lastContact: e.target.value })} className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 <div></div>
               </div>
 
-              <textarea rows="4" placeholder="Notes (optional)" value={newClient.notes} onChange={e => setNewClient({...newClient, notes: e.target.value})} className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+              <textarea rows="4" placeholder="Notes (optional)" value={newClient.notes} onChange={e => setNewClient({ ...newClient, notes: e.target.value })} className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
 
               <div className="flex justify-end gap-4 mt-6">
                 <button type="button" onClick={() => setIsAddModalOpen(false)} className="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50">
@@ -384,25 +384,25 @@ const ClientManagement = () => {
             <form onSubmit={handleEditClient} className="space-y-5">
               {/* Same form as Add modal but with selectedClient */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <input required type="text" placeholder="Full Name" value={selectedClient.name || ""} onChange={e => setSelectedClient({...selectedClient, name: e.target.value})} className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500" />
-                <input required type="email" placeholder="Email" value={selectedClient.email || ""} onChange={e => setSelectedClient({...selectedClient, email: e.target.value})} className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500" />
-                <input required type="text" placeholder="Phone" value={selectedClient.phone || ""} onChange={e => setSelectedClient({...selectedClient, phone: e.target.value})} className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500" />
-                <input required type="text" placeholder="Company" value={selectedClient.company || ""} onChange={e => setSelectedClient({...selectedClient, company: e.target.value})} className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500" />
-                <select value={selectedClient.industry || ""} onChange={e => setSelectedClient({...selectedClient, industry: e.target.value})} className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500">
+                <input required type="text" placeholder="Full Name" value={selectedClient.name || ""} onChange={e => setSelectedClient({ ...selectedClient, name: e.target.value })} className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500" />
+                <input required type="email" placeholder="Email" value={selectedClient.email || ""} onChange={e => setSelectedClient({ ...selectedClient, email: e.target.value })} className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500" />
+                <input required type="text" placeholder="Phone" value={selectedClient.phone || ""} onChange={e => setSelectedClient({ ...selectedClient, phone: e.target.value })} className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500" />
+                <input required type="text" placeholder="Company" value={selectedClient.company || ""} onChange={e => setSelectedClient({ ...selectedClient, company: e.target.value })} className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500" />
+                <select value={selectedClient.industry || ""} onChange={e => setSelectedClient({ ...selectedClient, industry: e.target.value })} className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500">
                   <option value="">Select Industry</option>
                   {industries.map(ind => <option key={ind} value={ind}>{ind}</option>)}
                 </select>
-                <select value={selectedClient.status || "Active"} onChange={e => setSelectedClient({...selectedClient, status: e.target.value})} className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500">
+                <select value={selectedClient.status || "Active"} onChange={e => setSelectedClient({ ...selectedClient, status: e.target.value })} className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500">
                   {statuses.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
-                <input type="number" placeholder="Project Value (₹)" value={selectedClient.value || ""} onChange={e => setSelectedClient({...selectedClient, value: e.target.value})} className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500" />
-                <input type="number" placeholder="Total Projects" value={selectedClient.projects || ""} onChange={e => setSelectedClient({...selectedClient, projects: e.target.value})} className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500" />
+                <input type="number" placeholder="Project Value (₹)" value={selectedClient.value || ""} onChange={e => setSelectedClient({ ...selectedClient, value: e.target.value })} className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500" />
+                <input type="number" placeholder="Total Projects" value={selectedClient.projects || ""} onChange={e => setSelectedClient({ ...selectedClient, projects: e.target.value })} className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500" />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <input type="date" value={selectedClient.lastContact?.split("T")[0] || ""} onChange={e => setSelectedClient({...selectedClient, lastContact: e.target.value})} className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500" />
+                <input type="date" value={selectedClient.lastContact?.split("T")[0] || ""} onChange={e => setSelectedClient({ ...selectedClient, lastContact: e.target.value })} className="px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500" />
                 <div></div>
               </div>
-              <textarea rows="4" placeholder="Notes (optional)" value={selectedClient.notes || ""} onChange={e => setSelectedClient({...selectedClient, notes: e.target.value})} className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500"></textarea>
+              <textarea rows="4" placeholder="Notes (optional)" value={selectedClient.notes || ""} onChange={e => setSelectedClient({ ...selectedClient, notes: e.target.value })} className="w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500"></textarea>
               <div className="flex justify-end gap-4 mt-6">
                 <button type="button" onClick={() => { setIsEditModalOpen(false); setSelectedClient(null); }} className="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50">
                   Cancel

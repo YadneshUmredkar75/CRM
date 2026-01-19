@@ -22,8 +22,8 @@ const AdminLogin = () => {
     }
 
     try {
-      // Vite proxy → /api/admin/login → https://crm-c1y4.onrender.com/api/admin/login
-      const res = await fetch("https://crm-c1y4.onrender.com/api/admin/login", {
+      // Vite proxy → /api/admin/login → https://crm-p35o.onrender.com/api/admin/login
+      const res = await fetch("https://crm-p35o.onrender.com/api/admin/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -60,9 +60,9 @@ const AdminLogin = () => {
         <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-8">
           {/* Header */}
           <div className="text-center mb-8">
-          
-              <img src="/logo.jpg" alt="ssgroup" className="w-20 h-20 bg-gradient-to-br  rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg" />
-          
+
+            <img src="/logo.jpg" alt="ssgroup" className="w-20 h-20 bg-gradient-to-br  rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg" />
+
             <h2 className="text-3xl font-bold text-gray-800">Admin Portal</h2>
             <p className="text-gray-600 mt-2">Secure access to management dashboard</p>
           </div>
@@ -125,11 +125,10 @@ const AdminLogin = () => {
             <button
               type="submit"
               disabled={loading}
-              className={`w-full py-3.5 px-4 rounded-lg font-semibold text-white shadow-md transition-all duration-200 flex items-center justify-center ${
-                loading
+              className={`w-full py-3.5 px-4 rounded-lg font-semibold text-white shadow-md transition-all duration-200 flex items-center justify-center ${loading
                   ? "bg-gray-400 cursor-not-allowed"
-                : "bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 hover:shadow-lg transform hover:-translate-y-0.5"
-              }`}
+                  : "bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 hover:shadow-lg transform hover:-translate-y-0.5"
+                }`}
             >
               {loading ? (
                 <>
@@ -182,7 +181,7 @@ const AdminLogin = () => {
             >
               Employee Login
             </Link>
-           
+
           </div>
 
           {/* Security Badge */}

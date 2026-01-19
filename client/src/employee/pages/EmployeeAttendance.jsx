@@ -27,7 +27,7 @@ const EmployeeAttendance = () => {
     if (!token) return;
     setLoading(true);
     try {
-      const res = await fetch("https://crm-c1y4.onrender.com/api/attendance/history", {
+      const res = await fetch("https://crm-p35o.onrender.com/api/attendance/history", {
         headers: { Authorization: `Bearer ${token}` },
       });
       const result = await res.json();
@@ -52,51 +52,51 @@ const EmployeeAttendance = () => {
     if (token) fetchAttendance();
   }, [fetchAttendance]);
 
-const handleClockIn = async () => {
-  setClocking("in");
+  const handleClockIn = async () => {
+    setClocking("in");
 
-  try {
-    // Get browser GPS
-    const position = await new Promise((resolve, reject) => {
-      navigator.geolocation.getCurrentPosition(resolve, reject, {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0,
+    try {
+      // Get browser GPS
+      const position = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0,
+        });
       });
-    });
 
-    const { latitude, longitude } = position.coords;
+      const { latitude, longitude } = position.coords;
 
-    const res = await fetch("https://crm-c1y4.onrender.com/api/attendance/clock-in", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        latitude,
-        longitude,
-        locationName: "Current Location",
-      }),
-    });
+      const res = await fetch("https://crm-p35o.onrender.com/api/attendance/clock-in", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          latitude,
+          longitude,
+          locationName: "Current Location",
+        }),
+      });
 
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.message || "Clock-in failed");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Clock-in failed");
 
-    toast.success("Clocked in successfully");
-    fetchAttendance();
-  } catch (err) {
-    toast.error(err.message || "GPS access denied");
-  } finally {
-    setClocking("");
-  }
-};
+      toast.success("Clocked in successfully");
+      fetchAttendance();
+    } catch (err) {
+      toast.error(err.message || "GPS access denied");
+    } finally {
+      setClocking("");
+    }
+  };
 
 
   const handleClockOut = async () => {
     setClocking("out");
     try {
-      const res = await fetch("https://crm-c1y4.onrender.com/api/attendance/clock-out", {
+      const res = await fetch("https://crm-p35o.onrender.com/api/attendance/clock-out", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -259,15 +259,14 @@ const handleClockIn = async () => {
                         </td>
                         <td className="px-8 py-4">
                           <span
-                            className={`px-3 py-1 rounded-full text-xs font-medium ${
-                              record.status === "present"
+                            className={`px-3 py-1 rounded-full text-xs font-medium ${record.status === "present"
                                 ? "bg-green-100 text-green-800"
                                 : record.status === "absent"
-                                ? "bg-red-100 text-red-800"
-                                : record.status === "late"
-                                ? "bg-yellow-100 text-yellow-800"
-                                : "bg-gray-100 text-gray-700"
-                            }`}
+                                  ? "bg-red-100 text-red-800"
+                                  : record.status === "late"
+                                    ? "bg-yellow-100 text-yellow-800"
+                                    : "bg-gray-100 text-gray-700"
+                              }`}
                           >
                             {record.status || "—"}
                           </span>

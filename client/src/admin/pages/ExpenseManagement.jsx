@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { toast, Toaster } from 'react-hot-toast';
 
-const API_URL = 'https://crm-c1y4.onrender.com/api/expenses';
+const API_URL = 'https://crm-p35o.onrender.com/api/expenses';
 
 export default function AdminExpenseDashboard() {
   const [expenses, setExpenses] = useState([]);
@@ -178,11 +178,10 @@ export default function AdminExpenseDashboard() {
                 <button
                   key={i}
                   onClick={() => { setSelectedTab(i); setPage(0); }}
-                  className={`px-8 py-4 font-medium border-b-2 transition ${
-                    selectedTab === i
+                  className={`px-8 py-4 font-medium border-b-2 transition ${selectedTab === i
                       ? 'border-blue-600 text-blue-600 bg-blue-50'
                       : 'border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                  }`}
+                    }`}
                 >
                   {tab.label} ({tab.count})
                 </button>

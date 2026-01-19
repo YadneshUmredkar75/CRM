@@ -7,7 +7,7 @@ import {
 import { Link, useNavigate } from "react-router-dom";
 
 const IST = "Asia/Kolkata";
-const API_BASE_URL = "https://crm-c1y4.onrender.com";
+const API_BASE_URL = "https://crm-p35o.onrender.com";
 
 const EmployeeData = () => {
   const [attendance, setAttendance] = useState([]);
@@ -272,12 +272,11 @@ const EmployeeData = () => {
               <Link
                 key={i}
                 to={btn.to}
-                className={`p-6 rounded-xl text-white font-medium text-center transition transform hover:scale-105 hover:shadow-lg ${
-                  btn.color === "blue" ? "bg-blue-600 hover:bg-blue-700" :
-                  btn.color === "purple" ? "bg-purple-600 hover:bg-purple-700" :
-                  btn.color === "yellow" ? "bg-yellow-600 hover:bg-yellow-700" :
-                  "bg-green-600 hover:bg-green-700"
-                }`}
+                className={`p-6 rounded-xl text-white font-medium text-center transition transform hover:scale-105 hover:shadow-lg ${btn.color === "blue" ? "bg-blue-600 hover:bg-blue-700" :
+                    btn.color === "purple" ? "bg-purple-600 hover:bg-purple-700" :
+                      btn.color === "yellow" ? "bg-yellow-600 hover:bg-yellow-700" :
+                        "bg-green-600 hover:bg-green-700"
+                  }`}
               >
                 <btn.icon className="w-10 h-10 mx-auto mb-2" />
                 {btn.label}
