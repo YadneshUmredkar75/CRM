@@ -92,7 +92,6 @@ const EmployeeAttendance = () => {
     }
   };
 
-
   const handleClockOut = async () => {
     setClocking("out");
     try {
@@ -120,8 +119,55 @@ const EmployeeAttendance = () => {
     navigate("/employee/login");
   };
 
-  const formatTime = (date) => (date ? format(new Date(date), "hh:mm a") : "—");
+  // Format time with minutes in 12-hour format (hh:mm a)
+  const formatTime = (date) => {
+    if (!date) return "—";
+    return format(new Date(date), "hh:mm a");
+  };
+
+  // Format time with seconds for detailed view (hh:mm:ss a)
+  const formatTimeWithSeconds = (date) => {
+    if (!date) return "—";
+    return format(new Date(date), "hh:mm:ss a");
+  };
+
+  // Format date
   const formatDate = (date) => format(new Date(date), "dd MMM yyyy");
+
+  // Calculate hours and minutes worked
+  const calculateWorkedTime = (clockIn, clockOut) => {
+    if (!clockIn || !clockOut) return { hours: 0, minutes: 0 };
+
+    const start = new Date(clockIn);
+    const end = new Date(clockOut);
+    const diffMs = end - start;
+
+    const hours = Math.floor(diffMs / (1000 * 60 * 60));
+    const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+
+    return { hours, minutes };
+  };
+
+  // Format worked time as "Xh Ym" or decimal hours
+  const formatWorkedTime = (clockIn, clockOut, hoursWorked) => {
+    if (!clockIn || !clockOut) return "—";
+
+    const { hours, minutes } = calculateWorkedTime(clockIn, clockOut);
+
+    // Return in "Xh Ym" format
+    if (hours === 0) {
+      return `${minutes}m`;
+    } else if (minutes === 0) {
+      return `${hours}h`;
+    } else {
+      return `${hours}h ${minutes}m`;
+    }
+  };
+
+  // Get current time with seconds
+  const getCurrentTimeWithSeconds = () => {
+    return format(new Date(), "hh:mm:ss a");
+  };
 
   const canClockIn = !todayRecord?.clockIn;
   const canClockOut = todayRecord?.clockIn && !todayRecord?.clockOut;
@@ -155,26 +201,65 @@ const EmployeeAttendance = () => {
         </div> */}
 
         <div className="max-w-6xl mx-auto p-6 space-y-8">
+          {/* Current Time Display */}
+          <div className="bg-white rounded-xl shadow-sm border p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-700">Current Time</h3>
+                <p className="text-3xl font-bold text-indigo-600 mt-2">
+                  {getCurrentTimeWithSeconds()}
+                </p>
+                <p className="text-sm text-gray-500 mt-1">
+                  {format(new Date(), "EEEE, dd MMMM yyyy")}
+                </p>
+              </div>
+              <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center">
+                <Clock className="w-8 h-8 text-indigo-600" />
+              </div>
+            </div>
+          </div>
 
           {/* Today's Status */}
           <div className="bg-white rounded-xl shadow-sm border p-8">
             <h2 className="text-xl font-semibold text-gray-800 mb-6">
-              Today - {format(new Date(), "EEEE, dd MMMM yyyy")}
+              Today's Attendance
             </h2>
 
             <div className="grid md:grid-cols-3 gap-8 mb-8">
-              <div>
-                <p className="text-sm text-gray-500">Clock In</p>
-                <p className="text-2xl font-medium">{formatTime(todayRecord?.clockIn)}</p>
+              <div className="bg-gray-50 p-6 rounded-lg">
+                <p className="text-sm text-gray-500 mb-1">Clock In</p>
+                <p className="text-2xl font-medium">
+                  {formatTime(todayRecord?.clockIn)}
+                </p>
+                {todayRecord?.clockIn && (
+                  <p className="text-sm text-gray-400 mt-1">
+                    {formatTimeWithSeconds(todayRecord?.clockIn)}
+                  </p>
+                )}
               </div>
-              <div>
-                <p className="text-sm text-gray-500">Clock Out</p>
-                <p className="text-2xl font-medium">{formatTime(todayRecord?.clockOut)}</p>
+
+              <div className="bg-gray-50 p-6 rounded-lg">
+                <p className="text-sm text-gray-500 mb-1">Clock Out</p>
+                <p className="text-2xl font-medium">
+                  {formatTime(todayRecord?.clockOut)}
+                </p>
+                {todayRecord?.clockOut && (
+                  <p className="text-sm text-gray-400 mt-1">
+                    {formatTimeWithSeconds(todayRecord?.clockOut)}
+                  </p>
+                )}
               </div>
-              <div>
-                <p className="text-sm text-gray-500">Hours Worked</p>
+
+              <div className="bg-indigo-50 p-6 rounded-lg">
+                <p className="text-sm text-gray-500 mb-1">Hours Worked</p>
                 <p className="text-2xl font-medium text-indigo-600">
-                  {(todayRecord?.hoursWorked || 0).toFixed(1)} hrs
+                  {todayRecord?.clockIn && todayRecord?.clockOut
+                    ? formatWorkedTime(todayRecord?.clockIn, todayRecord?.clockOut)
+                    : "—"
+                  }
+                </p>
+                <p className="text-sm text-gray-400 mt-1">
+                  {todayRecord?.hoursWorked ? `(${todayRecord.hoursWorked.toFixed(2)} hours)` : ""}
                 </p>
               </div>
             </div>
@@ -208,6 +293,16 @@ const EmployeeAttendance = () => {
                   Attendance Completed
                 </div>
               )}
+            </div>
+
+            {/* Status Message */}
+            <div className="mt-6 p-4 bg-blue-50 rounded-lg">
+              <p className="text-sm text-blue-700">
+                {canClockIn && "You can clock in for today's attendance."}
+                {canClockOut && "You have clocked in. You can clock out when your work is done."}
+                {isCompleted && "Your attendance for today is completed."}
+                {!todayRecord && "No attendance recorded for today yet."}
+              </p>
             </div>
           </div>
 
@@ -244,39 +339,103 @@ const EmployeeAttendance = () => {
                       <th className="text-left px-8 py-4 font-medium text-gray-700">Date</th>
                       <th className="text-left px-8 py-4 font-medium text-gray-700">Clock In</th>
                       <th className="text-left px-8 py-4 font-medium text-gray-700">Clock Out</th>
-                      <th className="text-left px-8 py-4 font-medium text-gray-700">Hours</th>
+                      <th className="text-left px-8 py-4 font-medium text-gray-700">Duration</th>
                       <th className="text-left px-8 py-4 font-medium text-gray-700">Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {attendance.map((record, i) => (
-                      <tr key={i} className="hover:bg-gray-50 transition">
-                        <td className="px-8 py-4 font-medium">{formatDate(record.date)}</td>
-                        <td className="px-8 py-4">{formatTime(record.clockIn)}</td>
-                        <td className="px-8 py-4">{formatTime(record.clockOut)}</td>
-                        <td className="px-8 py-4 font-medium text-indigo-600">
-                          {(record.hoursWorked || 0).toFixed(1)}h
-                        </td>
-                        <td className="px-8 py-4">
-                          <span
-                            className={`px-3 py-1 rounded-full text-xs font-medium ${record.status === "present"
-                                ? "bg-green-100 text-green-800"
-                                : record.status === "absent"
-                                  ? "bg-red-100 text-red-800"
-                                  : record.status === "late"
-                                    ? "bg-yellow-100 text-yellow-800"
-                                    : "bg-gray-100 text-gray-700"
-                              }`}
-                          >
-                            {record.status || "—"}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
+                    {attendance.map((record, i) => {
+                      const workedTime = formatWorkedTime(record.clockIn, record.clockOut);
+
+                      return (
+                        <tr key={i} className="hover:bg-gray-50 transition">
+                          <td className="px-8 py-4 font-medium">
+                            <div>{formatDate(record.date)}</div>
+                            <div className="text-sm text-gray-500">
+                              {format(new Date(record.date), "EEEE")}
+                            </div>
+                          </td>
+                          <td className="px-8 py-4">
+                            <div className="font-medium">{formatTime(record.clockIn)}</div>
+                            {record.clockIn && (
+                              <div className="text-sm text-gray-500">
+                                {formatTimeWithSeconds(record.clockIn)}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-8 py-4">
+                            <div className="font-medium">{formatTime(record.clockOut)}</div>
+                            {record.clockOut && (
+                              <div className="text-sm text-gray-500">
+                                {formatTimeWithSeconds(record.clockOut)}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-8 py-4">
+                            <div className="font-medium text-indigo-600">
+                              {workedTime}
+                            </div>
+                            {record.hoursWorked && (
+                              <div className="text-sm text-gray-500">
+                                ({record.hoursWorked.toFixed(2)} hours)
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-8 py-4">
+                            <span
+                              className={`px-3 py-1 rounded-full text-xs font-medium ${record.status === "present"
+                                  ? "bg-green-100 text-green-800"
+                                  : record.status === "absent"
+                                    ? "bg-red-100 text-red-800"
+                                    : record.status === "late"
+                                      ? "bg-yellow-100 text-yellow-800"
+                                      : "bg-gray-100 text-gray-700"
+                                }`}
+                            >
+                              {record.status || "—"}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
             )}
+          </div>
+
+          {/* Footer Info */}
+          <div className="bg-white rounded-xl shadow-sm border p-6">
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">Attendance Guidelines</h3>
+            <div className="grid md:grid-cols-3 gap-6">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
+                  <Clock className="w-5 h-5 text-indigo-600" />
+                </div>
+                <div>
+                  <h4 className="font-medium text-gray-700">Clock In</h4>
+                  <p className="text-sm text-gray-500 mt-1">Mark your arrival time when you start work</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                  <Clock className="w-5 h-5 text-red-600" />
+                </div>
+                <div>
+                  <h4 className="font-medium text-gray-700">Clock Out</h4>
+                  <p className="text-sm text-gray-500 mt-1">Mark your departure time when you finish work</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                  <CheckCircle className="w-5 h-5 text-green-600" />
+                </div>
+                <div>
+                  <h4 className="font-medium text-gray-700">Completed</h4>
+                  <p className="text-sm text-gray-500 mt-1">Both clock in and clock out recorded for the day</p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
