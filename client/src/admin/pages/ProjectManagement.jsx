@@ -4,7 +4,7 @@ import toast, { Toaster } from "react-hot-toast";
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: "https://crm-c1y4.onrender.com/api", // ADDED /api HERE
+  baseURL: "https://crm-p35o.onrender.com/api", // ADDED /api HERE
 });
 
 // Add token to every request
@@ -270,9 +270,9 @@ const ProjectManagement = () => {
                       <td className="px-6 py-4 font-bold text-green-600">₹{Number(p.budget).toLocaleString()}</td>
                       <td className="px-6 py-4">
                         <span className={`px-3 py-1 rounded-full text-xs font-bold ${p.status === "Completed" ? "bg-green-100 text-green-800" :
-                            p.status === "In Progress" ? "bg-blue-100 text-blue-800" :
-                              p.status === "Planning" ? "bg-yellow-100 text-yellow-800" :
-                                "bg-red-100 text-red-800"
+                          p.status === "In Progress" ? "bg-blue-100 text-blue-800" :
+                            p.status === "Planning" ? "bg-yellow-100 text-yellow-800" :
+                              "bg-red-100 text-red-800"
                           }`}>
                           {p.status}
                         </span>

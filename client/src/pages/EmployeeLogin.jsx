@@ -13,9 +13,9 @@ const EmployeeLogin = () => {
   const navigate = useNavigate();
 
   // Fix: Run auth check only once on component mount
-useEffect(() => {
-  setIsCheckingAuth(false);
-}, []);
+  useEffect(() => {
+    setIsCheckingAuth(false);
+  }, []);
 
   // Show loading while checking authentication
   if (isCheckingAuth) {
@@ -42,7 +42,7 @@ useEffect(() => {
     }
 
     try {
-      const res = await fetch("https://crm-c1y4.onrender.com/api/employee/login", {
+      const res = await fetch("https://crm-p35o.onrender.com/api/employee/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ identifier, password }),
@@ -87,7 +87,7 @@ useEffect(() => {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-100 flex items-center justify-center p-4">
       <div className="max-w-md w-full bg-white p-8 rounded-2xl shadow-lg border border-gray-200">
         <div className="text-center mb-8">
-         <img src="/logo.jpg" alt="ssgroup" className="w-20 h-20 bg-gradient-to-br  rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg" />
+          <img src="/logo.jpg" alt="ssgroup" className="w-20 h-20 bg-gradient-to-br  rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg" />
           <h2 className="text-3xl font-bold text-gray-800">Employee Login</h2>
           <p className="text-gray-600 mt-2">Access your dashboard</p>
         </div>
@@ -95,15 +95,14 @@ useEffect(() => {
         {/* Login Method Toggle */}
         <div className="flex bg-gray-100 rounded-lg p-1 mb-6">
           {["email", "loginId"].map(method => (
-            <button 
-              key={method} 
-              type="button" 
+            <button
+              key={method}
+              type="button"
               onClick={() => setLoginMethod(method)}
-              className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-                loginMethod === method 
-                  ? "bg-white text-blue-600 shadow-sm" 
+              className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${loginMethod === method
+                  ? "bg-white text-blue-600 shadow-sm"
                   : "text-gray-600 hover:text-gray-800"
-              }`}
+                }`}
             >
               {method === "email" ? "Email Login" : "Login ID"}
             </button>
@@ -112,15 +111,13 @@ useEffect(() => {
 
         {/* Error/Success Message */}
         {error && (
-          <div className={`px-4 py-3 rounded-lg mb-6 flex items-center ${
-            error.includes("Loaded") 
-              ? "bg-green-50 border border-green-200 text-green-700" 
+          <div className={`px-4 py-3 rounded-lg mb-6 flex items-center ${error.includes("Loaded")
+              ? "bg-green-50 border border-green-200 text-green-700"
               : "bg-red-50 border border-red-200 text-red-700"
-          }`}>
+            }`}>
             <svg
-              className={`w-4 h-4 mr-2 flex-shrink-0 ${
-                error.includes("Loaded") ? "text-green-600" : "text-red-600"
-              }`}
+              className={`w-4 h-4 mr-2 flex-shrink-0 ${error.includes("Loaded") ? "text-green-600" : "text-red-600"
+                }`}
               fill="currentColor"
               viewBox="0 0 20 20"
             >
@@ -155,7 +152,7 @@ useEffect(() => {
               autoComplete="username"
             />
           </div>
-          
+
           <div>
             <input
               type="password"
@@ -167,15 +164,14 @@ useEffect(() => {
               autoComplete="current-password"
             />
           </div>
-          
-          <button 
-            type="submit" 
+
+          <button
+            type="submit"
             disabled={loading}
-            className={`w-full py-3.5 px-4 rounded-lg font-semibold text-white shadow-md transition-all duration-200 flex items-center justify-center ${
-              loading
+            className={`w-full py-3.5 px-4 rounded-lg font-semibold text-white shadow-md transition-all duration-200 flex items-center justify-center ${loading
                 ? "bg-gray-400 cursor-not-allowed"
                 : "bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 hover:shadow-lg transform hover:-translate-y-0.5"
-            }`}
+              }`}
           >
             {loading ? (
               <>
@@ -225,8 +221,8 @@ useEffect(() => {
 
         {/* Admin Login Link */}
         <div className="text-center mt-6 pt-6 border-t border-gray-200">
-          <Link 
-            to="/admin" 
+          <Link
+            to="/admin"
             className="text-blue-600 hover:text-blue-800 font-medium transition-colors inline-flex items-center"
           >
             <svg

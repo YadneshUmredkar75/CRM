@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { toast, Toaster } from 'react-hot-toast';
 
-const API_URL = 'https://crm-c1y4.onrender.com/api/expenses';
+const API_URL = 'https://crm-p35o.onrender.com/api/expenses';
 
 export default function ExpenseManagement() {
   const [expenses, setExpenses] = useState([]);
@@ -184,12 +184,10 @@ export default function ExpenseManagement() {
               { label: "Rejected", value: stats.rejected, icon: XCircle, color: "red" },
             ].map((s, i) => (
               <div key={i} className="bg-white rounded-2xl shadow-xl p-6 text-center border">
-                <div className={`inline-flex p-4 rounded-full mb-3 ${
-                  i === 0 ? 'bg-gray-100' : i === 1 ? 'bg-yellow-100' : i === 2 ? 'bg-blue-100' : i === 3 ? 'bg-green-100' : 'bg-red-100'
-                }`}>
-                  <s.icon className={`w-8 h-8 ${
-                    i === 0 ? 'text-gray-600' : i === 1 ? 'text-yellow-600' : i === 2 ? 'text-blue-600' : i === 3 ? 'text-green-600' : 'text-red-600'
-                  }`} />
+                <div className={`inline-flex p-4 rounded-full mb-3 ${i === 0 ? 'bg-gray-100' : i === 1 ? 'bg-yellow-100' : i === 2 ? 'bg-blue-100' : i === 3 ? 'bg-green-100' : 'bg-red-100'
+                  }`}>
+                  <s.icon className={`w-8 h-8 ${i === 0 ? 'text-gray-600' : i === 1 ? 'text-yellow-600' : i === 2 ? 'text-blue-600' : i === 3 ? 'text-green-600' : 'text-red-600'
+                    }`} />
                 </div>
                 <p className="text-3xl font-bold text-gray-800">{s.value}</p>
                 <p className="text-gray-600 mt-1">{s.label}</p>
@@ -352,12 +350,11 @@ export default function ExpenseManagement() {
                                 {format(new Date(exp.date), 'dd MMM yyyy')}
                               </td>
                               <td className="px-6 py-5">
-                                <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold ${
-                                  status.color === 'yellow' ? 'bg-yellow-100 text-yellow-800' :
-                                  status.color === 'blue' ? 'bg-blue-100 text-blue-800' :
-                                  status.color === 'green' ? 'bg-green-100 text-green-800' :
-                                  'bg-red-100 text-red-800'
-                                }`}>
+                                <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold ${status.color === 'yellow' ? 'bg-yellow-100 text-yellow-800' :
+                                    status.color === 'blue' ? 'bg-blue-100 text-blue-800' :
+                                      status.color === 'green' ? 'bg-green-100 text-green-800' :
+                                        'bg-red-100 text-red-800'
+                                  }`}>
                                   <status.icon className="w-4 h-4" />
                                   {status.label}
                                 </span>

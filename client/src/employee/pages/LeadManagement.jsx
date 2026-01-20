@@ -1,13 +1,13 @@
 // src/pages/employee/LeadManagement.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import { format } from 'date-fns';
-import { 
-  Plus, Search, Phone, Mail, CheckCircle, XCircle, Trash2, 
+import {
+  Plus, Search, Phone, Mail, CheckCircle, XCircle, Trash2,
   RefreshCw, Users, IndianRupee, AlertCircle, Clock   // Clock added here
 } from 'lucide-react';
 import { toast, Toaster } from 'react-hot-toast';
 
-const API_URL = 'https://crm-c1y4.onrender.com/api/lead';
+const API_URL = 'https://crm-p35o.onrender.com/api/lead';
 
 const LeadManagement = () => {
   const [leads, setLeads] = useState([]);
@@ -346,11 +346,10 @@ const LeadManagement = () => {
                           {lead.leadType === 'Course' ? lead.courseName : `${lead.companyName} - ${lead.jobRole}`}
                         </td>
                         <td className="px-6 py-5 text-center">
-                          <span className={`inline-flex items-center gap-1 px-4 py-2 rounded-full text-xs font-bold ${
-                            lead.status === 'Converted' ? 'bg-green-100 text-green-800' :
-                            lead.status === 'Lost' ? 'bg-red-100 text-red-800' :
-                            'bg-yellow-100 text-yellow-800'
-                          }`}>
+                          <span className={`inline-flex items-center gap-1 px-4 py-2 rounded-full text-xs font-bold ${lead.status === 'Converted' ? 'bg-green-100 text-green-800' :
+                              lead.status === 'Lost' ? 'bg-red-100 text-red-800' :
+                                'bg-yellow-100 text-yellow-800'
+                            }`}>
                             {lead.status === 'Converted' && <CheckCircle className="w-4 h-4" />}
                             {lead.status === 'Lost' && <XCircle className="w-4 h-4" />}
                             {lead.status}

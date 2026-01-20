@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { toast, Toaster } from 'react-hot-toast';
 
-const API_URL = 'https://crm-c1y4.onrender.com/api/lead';
+const API_URL = 'https://crm-p35o.onrender.com/api/lead';
 
 export default function AdminLeadIncentiveDashboard() {
   const [leads, setLeads] = useState([]);
@@ -50,7 +50,7 @@ export default function AdminLeadIncentiveDashboard() {
     try {
       const [leadsRes, empRes] = await Promise.all([
         fetch(`${API_URL}/all`, { headers: { Authorization: `Bearer ${token}` } }),
-        fetch('https://crm-c1y4.onrender.com/api/employee/all', { headers: { Authorization: `Bearer ${token}` } })
+        fetch('https://crm-p35o.onrender.com/api/employee/all', { headers: { Authorization: `Bearer ${token}` } })
       ]);
 
       if (leadsRes.ok) {
@@ -311,17 +311,15 @@ export default function AdminLeadIncentiveDashboard() {
                         )}
                       </td>
                       <td className="p-4 text-center">
-                        <span className={`px-3 py-1 rounded text-xs font-medium ${
-                          lead.status === 'Converted' ? 'bg-green-100 text-green-800' :
-                          lead.status === 'Lost' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'
-                        }`}>
+                        <span className={`px-3 py-1 rounded text-xs font-medium ${lead.status === 'Converted' ? 'bg-green-100 text-green-800' :
+                            lead.status === 'Lost' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'
+                          }`}>
                           {lead.status}
                         </span>
                       </td>
                       <td className="p-4 text-center">
-                        <span className={`px-3 py-1 rounded text-xs font-medium ${
-                          lead.paymentStatus === 'Pay Done' ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'
-                        }`}>
+                        <span className={`px-3 py-1 rounded text-xs font-medium ${lead.paymentStatus === 'Pay Done' ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'
+                          }`}>
                           {lead.paymentStatus === 'Pay Done' ? 'Paid' : 'Pending'}
                         </span>
                       </td>

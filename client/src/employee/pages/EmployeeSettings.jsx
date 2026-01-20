@@ -36,7 +36,7 @@ const EmployeeSettings = () => {
   const fetchEmployeeData = async () => {
     try {
       setLoading(true);
-      const res = await fetch("https://crm-c1y4.onrender.com/api/employee/me", {
+      const res = await fetch("https://crm-p35o.onrender.com/api/employee/me", {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -113,7 +113,7 @@ const EmployeeSettings = () => {
     }
 
     try {
-      const res = await fetch("https://crm-c1y4.onrender.com/api/employee/me/change-password", {
+      const res = await fetch("https://crm-p35o.onrender.com/api/employee/me/change-password", {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -145,7 +145,7 @@ const EmployeeSettings = () => {
     setProfileLoading(true);
 
     try {
-      const res = await fetch("https://crm-c1y4.onrender.com/api/employee/update-profile", {
+      const res = await fetch("https://crm-p35o.onrender.com/api/employee/update-profile", {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -186,7 +186,7 @@ const EmployeeSettings = () => {
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
         <div className="bg-white rounded-2xl shadow-xl p-8">
           <div className="text-center text-red-600">Failed to load employee data</div>
-          <button 
+          <button
             onClick={() => navigate("/employee/login")}
             className="mt-4 bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg"
           >
@@ -214,21 +214,19 @@ const EmployeeSettings = () => {
           {/* Tab Navigation */}
           <div className="flex border-b border-gray-200 mb-6">
             <button
-              className={`py-2 px-4 font-medium text-sm border-b-2 transition-colors ${
-                activeTab === "profile"
+              className={`py-2 px-4 font-medium text-sm border-b-2 transition-colors ${activeTab === "profile"
                   ? "border-purple-500 text-purple-600"
                   : "border-transparent text-gray-500 hover:text-gray-700"
-              }`}
+                }`}
               onClick={() => setActiveTab("profile")}
             >
               Profile Information
             </button>
             <button
-              className={`py-2 px-4 font-medium text-sm border-b-2 transition-colors ${
-                activeTab === "password"
+              className={`py-2 px-4 font-medium text-sm border-b-2 transition-colors ${activeTab === "password"
                   ? "border-purple-500 text-purple-600"
                   : "border-transparent text-gray-500 hover:text-gray-700"
-              }`}
+                }`}
               onClick={() => setActiveTab("password")}
             >
               Change Password
@@ -372,11 +370,10 @@ const EmployeeSettings = () => {
                     </div>
                     <div className="flex justify-between items-center py-2">
                       <span className="text-gray-600 font-medium">Status</span>
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs border ${
-                        employee.status === "Active" 
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs border ${employee.status === "Active"
                           ? "bg-green-100 text-green-700 border-green-200"
                           : "bg-red-100 text-red-700 border-red-200"
-                      }`}>
+                        }`}>
                         {employee.status}
                       </span>
                     </div>

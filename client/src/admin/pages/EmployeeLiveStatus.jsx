@@ -69,7 +69,7 @@ const EmployeeManagement = () => {
   const [newEmployeeCredentials, setNewEmployeeCredentials] = useState(null);
 
   const token = localStorage.getItem("adminToken");
-  const API_URL = "https://crm-c1y4.onrender.com/api";
+  const API_URL = "https://crm-p35o.onrender.com/api";
 
   const departments = [
     { id: 1, name: "Sales" },
