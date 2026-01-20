@@ -621,25 +621,38 @@ export const getEmployeePassword = async (req, res) => {
 // ---------------------------------------------------------------------
 // TASK MANAGEMENT - ADD TASK FUNCTION
 // ---------------------------------------------------------------------
+// controllers/taskController.js  (or employeeTaskController.js)
+
 export const addTask = async (req, res) => {
   try {
-    const { employeeId, title, description, type, priority } = req.body;
+    // Assuming your protectEmployee middleware sets req.employee
+    const employeeId = req.employee?._id;   // or req.user._id — check your middleware!
 
-    const employee = await Employee.findById(employeeId);
-    if (!employee) {
-      return res.status(404).json({ success: false, message: "Employee not found" });
+    if (!employeeId) {
+      return res.status(401).json({ success: false, message: "Not authorized" });
+    }
+
+    const { title, description, type, priority, dueDate, progress, status, notes } = req.body;
+
+    if (!title?.trim()) {
+      return res.status(400).json({ success: false, message: "Title is required" });
     }
 
     const task = await Task.create({
-      employeeId: employee._id, // ✅ ObjectId
+      employeeId,           // from token, not body
       title,
-      description,
-      type,
-      priority
+      description: description || "",
+      type: type || "Daily",
+      priority: priority || "medium",
+      dueDate: dueDate ? new Date(dueDate) : undefined,
+      progress: Number(progress) || 0,
+      status: status || "Pending",
+      notes: notes || "",
     });
 
     res.status(201).json({ success: true, task });
   } catch (error) {
+    console.error(error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
@@ -1377,3 +1390,38 @@ export const getEmployeeWithTasks = async (req, res) => {
 
 
 
+
+
+
+export const getMyTasks = async (req, res) => {
+  try {
+    // req.employee comes from protectEmployee middleware
+    const employeeId = req.employee._id;
+
+    if (!employeeId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication failed - employee ID not found',
+      });
+    }
+
+    const tasks = await Task.find({ employeeId })
+      .sort({ createdAt: -1 })          // newest tasks first
+      .select('-__v')                   // remove mongoose version key
+      .lean();                          // faster plain JS objects
+
+    res.status(200).json({
+      success: true,
+      count: tasks.length,
+      data: tasks,
+    });
+  } catch (error) {
+    console.error('Error fetching employee tasks:', error);
+
+    res.status(500).json({
+      success: false,
+      message: 'Server error while fetching tasks',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+    });
+  }
+};

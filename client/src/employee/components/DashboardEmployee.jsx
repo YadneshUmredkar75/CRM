@@ -40,7 +40,7 @@ import StudentForm from "../../pages/StudentForm";
 import EmployeeData from "../pages/EmployeeData";
 import LeadManagement from "../pages/LeadManagement";
 import LeaveApplicationForm from "../pages/LeaveApplicaationForm";
-
+import EmployeeTasks from "../pages/EmployeeTasks"
 /* ==================== DASHBOARD CONTENT ==================== */
 const DashboardContent = () => {
   const [stats, setStats] = useState({
@@ -338,7 +338,8 @@ const DashboardEmployee = () => {
     { path: "/employee/dashboard/QRstudentattendance", label: "Student QR Attendance", icon: <BsQrCodeScan /> },
     { path: "/employee/dashboard/leaverequest", label: "Leave Request", icon: <SiGoogleforms /> },
     { path: "/employee/dashboard/leadmanagement", label: "Lead Management", icon: <FaUserPlus /> },
-    { path: "/employee/dashboard/task", label: "My Tasks", icon: <SiGoogletasks /> },
+    // { path: "/employee/dashboard/task", label: "My Tasks", icon: <SiGoogletasks /> },
+     { path: "/employee/dashboard/all/tasks", label: "My Tasks", icon: <SiGoogletasks /> },
     { path: "/employee/dashboard/expense", label: "Expense", icon: <FaMoneyBillWave /> },
     { path: "/employee/dashboard/settings", label: "Settings", icon: <FiSettings /> },
   ];
@@ -357,6 +358,7 @@ const DashboardEmployee = () => {
           "/employee/dashboard/leadmanagement", // Lead Management (if interns need this)
           "/employee/dashboard/expense", // Expense
           "/employee/dashboard/task", // My Tasks
+          "/employee/dashboard/all/tasks", // Employee Tasks
           "/employee/dashboard/settings", // Settings
         ];
         return allowedRoutes.includes(item.path);
@@ -380,7 +382,7 @@ const DashboardEmployee = () => {
         "/employee/dashboard/leaverequest",
         "/employee/dashboard/leadmanagement",
         "/employee/dashboard/expense",
-        "/employee/dashboard/task",
+        "/employee/dashboard/all/tasks",
         "/employee/dashboard/settings",
       ];
       
@@ -544,7 +546,8 @@ const DashboardEmployee = () => {
               <Route path="attendance" element={<EmployeeAttendance />} />
               <Route path="leaverequest" element={<LeaveApplicationForm />} />
               <Route path="leadmanagement" element={<LeadManagement />} />
-              <Route path="task" element={<TaskTracker />} />
+              {/* <Route path="task" element={<TaskTracker />} /> */}
+              <Route path="all/tasks" element={<EmployeeTasks />} />
               <Route path="expense" element={<Expense />} />
               <Route path="settings" element={<EmployeeSettings />} />
               

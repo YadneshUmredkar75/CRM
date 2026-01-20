@@ -3,8 +3,8 @@ import { Router } from "express";
 import {
   getAll, createEmployee, updateEmployee, deleteEmployee,
   login, resetPassword, changePassword, getEmployeePassword,
-  getTasks, addTask, updateTaskByEmployee, deleteTask, getEmployeeTasks, getEmployeeAttendance, getEmployeePerformance,
-  getEmployeeById, getCurrentEmployee, updateProfile,getEmployeeWithTasks,updateTask
+  getTasks, addTask, updateTask, deleteTask, getEmployeeTasks, getEmployeeAttendance, getEmployeePerformance,
+  getEmployeeById, getCurrentEmployee, updateProfile,updateTaskByEmployee,getEmployeeWithTasks,getMyTasks
 } from "../controllers/employeeController.js";
 import { protectEmployee } from "../middleware/authEmployee.js";
 const router = Router();
@@ -13,16 +13,17 @@ const router = Router();
 router.post("/login", login);
 
 // EMPLOYEE ROUTES - NO PROTECTION
-// router.get("/all-tasks", getAllTasks)
 router.get("/me",protectEmployee, getCurrentEmployee);
 router.patch("/me/change-password",protectEmployee, changePassword);
 router.patch("/update-profile",protectEmployee, updateProfile);
+// routes/employeeRoutes.js
+router.get('/my/tasks',protectEmployee, getMyTasks);
 router.get("/:id/tasks", getEmployeeWithTasks);
 router.get("/task", getTasks);
-router.post("/task", addTask);
-router.put("/employee/:employeeId/task/:taskId", updateTaskByEmployee);
-router.patch("/task/:id", updateTask);
-router.delete("/task/:id", deleteTask);
+router.post("/task", protectEmployee,addTask);
+router.put("/employee/:employeeId/task/:taskId",protectEmployee, updateTaskByEmployee);
+router.patch("/task/:id",protectEmployee, updateTask);
+router.delete("/task/:id", protectEmployee,deleteTask);
 router.get("/employee/:id/tasks", getEmployeeTasks);
 router.get("/employee/:id/", getEmployeeById);
 

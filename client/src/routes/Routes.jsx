@@ -143,6 +143,14 @@ const AppRoutes = () => (
         </ProtectedRoute>
       } 
     />
+    \<Route 
+      path="/employee/task" 
+      element={
+        <ProtectedRoute requiredRole="employee">
+          <DashboardEmployee />
+        </ProtectedRoute>
+      } 
+    />
     
     {/* Catch all route */}
     <Route path="*" element={<Navigate to="/" replace />} />

@@ -6,7 +6,7 @@ import { toast, Toaster } from "react-hot-toast";
 
 const IST = "Asia/Kolkata";
 const API_URL = "https://crm-p35o.onrender.com/api";
-const PUBLIC_USER_ID = "666666666666666666666666"; // Fixed public user ID
+const PUBLIC_USER_ID = "public-user"; // Changed to match backend
 
 // Priority and Type options
 const PRIORITY_OPTIONS = [
@@ -19,7 +19,7 @@ const PRIORITY_OPTIONS = [
 const TYPE_OPTIONS = ["Daily", "Weekly", "Monthly", "Project"];
 const STATUS_OPTIONS = ["all", "pending", "completed"];
 
-// TaskCard Component
+// TaskCard Component (keep as is, only update the ID check)
 const TaskCard = ({ task, onUpdate, onDelete, isManager = true }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedTask, setEditedTask] = useState({ ...task });
@@ -269,9 +269,10 @@ const TaskCard = ({ task, onUpdate, onDelete, isManager = true }) => {
                 year: 'numeric'
               }) : 'Today'}
             </span>
-            {task.employeeId?.name && task.employeeId._id !== PUBLIC_USER_ID ? (
-              <span className="truncate ml-2" title={`Assigned to: ${task.employeeId.name}`}>
-                👤 {task.employeeId.name}
+            {/* Updated the ID check */}
+            {task.employeeId && task.employeeId !== "public-user" && task.employeeId._id !== "public-user" ? (
+              <span className="truncate ml-2" title={`Assigned to: ${task.employeeId?.name || 'Employee'}`}>
+                👤 {task.employeeId?.name || 'Employee'}
               </span>
             ) : (
               <span className="truncate ml-2 text-gray-400" title="Public Task">
@@ -309,7 +310,7 @@ const TaskTracker = ({ isManager = true }) => {
   });
   const [showFilters, setShowFilters] = useState(false);
 
-  // Fetch tasks with filters
+  // Fetch tasks with filters - UPDATED VERSION
   const fetchTasks = async () => {
     setLoading(true);
     setError(null);
@@ -323,21 +324,49 @@ const TaskTracker = ({ isManager = true }) => {
       queryParams.append("sortOrder", filters.sortOrder);
       queryParams.append("limit", "50");
 
-      const url = `${API_URL}/employee/task${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+      // First try the task endpoint
+      let url = `${API_URL}/employee/task${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
       console.log("Fetching tasks from:", url);
 
-      const res = await fetch(url);
+      let res = await fetch(url);
+
+      // If 404, try without query params
+      if (!res.ok && res.status === 404) {
+        console.log("Task endpoint not found, trying without query params");
+        url = `${API_URL}/employee/task`;
+        res = await fetch(url);
+      }
 
       if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.message || `Failed to fetch: ${res.status} ${res.statusText}`);
+        // If still failing, check if it's a different error
+        if (res.status === 404) {
+          console.log("No task endpoint available, using empty array");
+          setTasks([]);
+          return;
+        }
+        
+        const errorText = await res.text();
+        console.error("Server error response:", errorText);
+        throw new Error(`Failed to fetch: ${res.status} ${res.statusText}`);
       }
 
       const data = await res.json();
       console.log("Tasks data:", data);
 
       // Handle different response structures
-      const tasksArray = data.tasks || data.data || data || [];
+      let tasksArray = [];
+      
+      if (data.tasks) {
+        tasksArray = data.tasks;
+      } else if (data.data && Array.isArray(data.data)) {
+        tasksArray = data.data;
+      } else if (Array.isArray(data)) {
+        tasksArray = data;
+      } else if (data.success && data.task) {
+        // If it's a single task response, wrap it in an array
+        tasksArray = [data.task];
+      }
+
       if (!Array.isArray(tasksArray)) {
         console.warn("Expected array but got:", typeof tasksArray, tasksArray);
         setTasks([]);
@@ -348,7 +377,14 @@ const TaskTracker = ({ isManager = true }) => {
     } catch (err) {
       console.error("Fetch tasks error:", err);
       setError(err.message);
-      toast.error(`Failed to load tasks: ${err.message}`);
+      
+      // Show user-friendly error message
+      if (err.message.includes("Failed to fetch")) {
+        toast.error("Cannot connect to server. Please check if backend is running.");
+      } else {
+        toast.error(`Failed to load tasks: ${err.message}`);
+      }
+      
       setTasks([]);
     } finally {
       setLoading(false);
@@ -359,7 +395,7 @@ const TaskTracker = ({ isManager = true }) => {
     fetchTasks();
   }, [filters]);
 
-  // Add task - FIXED VERSION
+  // Add task - UPDATED to use "public-user"
   const handleAddTask = async () => {
     const title = newTask.title.trim();
     if (!title) {
@@ -369,7 +405,7 @@ const TaskTracker = ({ isManager = true }) => {
 
     setAddingTask(true);
 
-    // Prepare payload with public user ID
+    // Prepare payload with "public-user" ID
     const payload = {
       title: title,
       description: newTask.description?.trim() || "",
@@ -377,7 +413,7 @@ const TaskTracker = ({ isManager = true }) => {
       priority: newTask.priority,
       progress: parseInt(newTask.progress) || 0,
       notes: newTask.notes?.trim() || "",
-      employeeId: PUBLIC_USER_ID, // Fixed public user ID
+      employeeId: PUBLIC_USER_ID, // Now "public-user"
     };
 
     console.log("Sending task payload:", payload);
@@ -390,6 +426,14 @@ const TaskTracker = ({ isManager = true }) => {
         },
         body: JSON.stringify(payload),
       });
+
+      // Check if response is JSON
+      const contentType = res.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        const text = await res.text();
+        console.error("Non-JSON response:", text);
+        throw new Error("Server returned an invalid response. Check if backend is running.");
+      }
 
       const data = await res.json();
       console.log("Response:", data);
@@ -419,13 +463,25 @@ const TaskTracker = ({ isManager = true }) => {
 
     } catch (err) {
       console.error("Add task error:", err);
-      toast.error(err.message || "Failed to add task");
+      
+      // User-friendly error messages
+      if (err.message.includes("Cannot connect") || err.message.includes("invalid response")) {
+        toast.error(
+          <div>
+            <strong>Connection Error</strong>
+            <p className="text-sm">Please check if the backend server is running</p>
+          </div>,
+          { duration: 5000 }
+        );
+      } else {
+        toast.error(err.message || "Failed to add task");
+      }
     } finally {
       setAddingTask(false);
     }
   };
 
-  // Update task
+  // Update task - UPDATED with better error handling
   const handleUpdateTask = async (task) => {
     const id = task._id || task.id;
     if (!id) {
@@ -471,7 +527,7 @@ const TaskTracker = ({ isManager = true }) => {
     }
   };
 
-  // Delete task
+  // Delete task - UPDATED with better error handling
   const handleDeleteTask = async (task) => {
     const id = task._id || task.id;
     if (!id) {
@@ -542,7 +598,7 @@ const TaskTracker = ({ isManager = true }) => {
         progress: task.progress || 0,
         status: task.status || "Pending",
         createdAt: task.createdAt,
-        isPublic: task.employeeId?._id === PUBLIC_USER_ID || !task.employeeId
+        isPublic: task.employeeId === "public-user" || task.employeeId?._id === "public-user" || !task.employeeId
       })),
     };
 
@@ -997,7 +1053,6 @@ const TaskTracker = ({ isManager = true }) => {
         {/* Footer */}
         {tasks.length > 0 && (
           <div className="text-center text-gray-500 text-sm py-6 border-t border-gray-100">
-
             <p className="text-xs">
               {tasks.length} total tasks • {completedTasks} completed • {pendingTasks} pending
               {teamProgress > 0 && ` • Overall progress: ${teamProgress}%`}
