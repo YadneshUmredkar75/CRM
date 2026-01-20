@@ -1,66 +1,81 @@
-// src/models/taskModel.js
 import mongoose from "mongoose";
 
 const taskSchema = new mongoose.Schema(
   {
-    employeeId: { 
-      type: mongoose.Schema.Types.ObjectId, 
-      ref: "Employee", 
-      required: true 
-    },
-    title: { 
-      type: String, 
+    employeeId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Employee",
       required: true,
-      trim: true 
+      index: true
     },
-    description: { 
+
+    title: {
       type: String,
-      trim: true 
+      required: true,
+      trim: true
     },
-    type: { 
-      type: String, 
-      enum: ["Daily", "Weekly", "Monthly", "Project"], 
-      default: "Daily" 
+
+    description: {
+      type: String,
+      trim: true
     },
+
+    type: {
+      type: String,
+      enum: ["Daily", "Weekly", "Monthly", "Project"],
+      default: "Daily"
+    },
+
     status: {
       type: String,
       enum: ["Pending", "In Progress", "Completed", "On Hold"],
       default: "Pending"
     },
+
     priority: {
       type: String,
       enum: ["low", "medium", "high", "urgent"],
       default: "medium"
     },
-    progress: { 
-      type: Number, 
-      min: 0, 
-      max: 100, 
-      default: 0 
+
+    progress: {
+      type: Number,
+      min: 0,
+      max: 100,
+      default: 0
     },
-    dueDate: {
-      type: Date
-    },
-    notes: { 
+
+    dueDate: Date,
+
+    notes: {
       type: String,
-      trim: true 
+      trim: true
     },
-    lastUpdated: { 
-      type: Date, 
-      default: Date.now 
+
+    lastUpdated: {
+      type: Date,
+      default: Date.now
     },
-    completedAt: {
-      type: Date
-    }
+
+    completedAt: Date
   },
   { timestamps: true }
 );
 
-
-
-// Method to check if task is completed
-taskSchema.methods.isCompleted = function() {
+// Check completion
+taskSchema.methods.isCompleted = function () {
   return this.status === "Completed" || this.progress === 100;
 };
 
-export default mongoose.model("Task", taskSchema);
+// Auto update completed date
+taskSchema.pre("save", function (next) {
+  if (this.isCompleted() && !this.completedAt) {
+    this.completedAt = new Date();
+  }
+  this.lastUpdated = new Date();
+  next();
+});
+
+// ✅ SAFE EXPORT
+export default mongoose.models.Task ||
+  mongoose.model("Task", taskSchema);
