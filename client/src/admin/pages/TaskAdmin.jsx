@@ -1,1201 +1,625 @@
 // src/pages/admin/TaskAdmin.jsx
-import React, { useState, useEffect } from "react";
+import React, {
+  useState, useEffect, useCallback, useMemo, useRef, memo
+} from "react";
+import ReactDOM from "react-dom";
 import {
-    FileText, Search, Filter, Download, Eye, Edit, Trash2, Users,
-    Calendar, Flag, Loader, RefreshCw, Plus, Clock, MessageSquare,
-    AlertCircle, CheckCircle, PlayCircle, PauseCircle, MoreVertical
+  FileText, Search, Filter, Download, Eye, Trash2,
+  Calendar, Flag, RefreshCw, Plus, Clock, MessageSquare,
+  AlertCircle, CheckCircle, PlayCircle, PauseCircle, MoreVertical, X
 } from "lucide-react";
 import { toast, Toaster } from "react-hot-toast";
 
-const API_URL = "https://crm-p35o.onrender.com/api";
+// ─── CONSTANTS ────────────────────────────────────────────────────────────────
+const API_URL  = "https://crm-p35o.onrender.com/api";
+const BATCH_SZ = 4;
 
-const PRIORITY_COLORS = {
-    low: "bg-blue-100 text-blue-800 border border-blue-200",
-    medium: "bg-yellow-100 text-yellow-800 border border-yellow-200",
-    high: "bg-orange-100 text-orange-800 border border-orange-200",
-    urgent: "bg-red-100 text-red-800 border border-red-200"
+const PRIORITY_META = {
+  low:    { cls: "bg-blue-50 text-blue-700 border-blue-200",      icon: <Flag className="w-3 h-3" /> },
+  medium: { cls: "bg-amber-50 text-amber-700 border-amber-200",   icon: <Flag className="w-3 h-3" /> },
+  high:   { cls: "bg-orange-50 text-orange-700 border-orange-200",icon: <Flag className="w-3 h-3" /> },
+  urgent: { cls: "bg-red-50 text-red-700 border-red-200",          icon: <AlertCircle className="w-3 h-3" /> },
+};
+const STATUS_META = {
+  pending:       { cls: "bg-gray-100 text-gray-700 border-gray-200",        icon: <Clock className="w-3 h-3" /> },
+  "in progress": { cls: "bg-blue-50 text-blue-700 border-blue-200",         icon: <PlayCircle className="w-3 h-3" /> },
+  completed:     { cls: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: <CheckCircle className="w-3 h-3" /> },
+  "on hold":     { cls: "bg-purple-50 text-purple-700 border-purple-200",    icon: <PauseCircle className="w-3 h-3" /> },
+};
+const TYPE_META = {
+  Daily:   "bg-indigo-50 text-indigo-700 border-indigo-200",
+  Weekly:  "bg-pink-50 text-pink-700 border-pink-200",
+  Monthly: "bg-teal-50 text-teal-700 border-teal-200",
+  Project: "bg-amber-50 text-amber-700 border-amber-200",
+};
+const EMPTY_TASK = {
+  title:"", description:"", type:"Daily", priority:"medium",
+  progress:0, employeeId:"", dueDate:"", notes:"",
 };
 
-const PRIORITY_ICONS = {
-    low: <Flag className="w-3 h-3 text-blue-600" />,
-    medium: <Flag className="w-3 h-3 text-yellow-600" />,
-    high: <Flag className="w-3 h-3 text-orange-600" />,
-    urgent: <AlertCircle className="w-3 h-3 text-red-600" />
+// ─── UTILS ────────────────────────────────────────────────────────────────────
+const fmtDate = (d) => {
+  if (!d) return "N/A";
+  try { const dt=new Date(d); return isNaN(dt)?"N/A":dt.toLocaleDateString("en-IN",{year:"numeric",month:"short",day:"numeric"}); }
+  catch { return "N/A"; }
+};
+const fmtDateTime = (d) => {
+  if (!d) return "N/A";
+  try { const dt=new Date(d); return isNaN(dt)?"N/A":dt.toLocaleString("en-IN",{year:"numeric",month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"}); }
+  catch { return "N/A"; }
+};
+const toDateStr = (d) => {
+  if (!d) return "";
+  try { const dt=new Date(d); return isNaN(dt)?"":dt.toISOString().slice(0,10); }
+  catch { return ""; }
 };
 
-const STATUS_COLORS = {
-    pending: "bg-gray-100 text-gray-800 border border-gray-200",
-    "in progress": "bg-blue-100 text-blue-800 border border-blue-200",
-    completed: "bg-green-100 text-green-800 border border-green-200",
-    "on hold": "bg-purple-100 text-purple-800 border border-purple-200"
+function useDebounce(val, ms=280) {
+  const [dv,setDv]=useState(val);
+  useEffect(()=>{ const t=setTimeout(()=>setDv(val),ms); return ()=>clearTimeout(t); },[val,ms]);
+  return dv;
+}
+
+const enrichTask=(task,emp)=>({
+  ...task,
+  employeeId:{_id:emp._id,name:emp.name,email:emp.email,position:emp.position,department:emp.department},
+  lastUpdated:task.lastUpdated||task.updatedAt,
+  dueDate:    task.dueDate    ||task.due,
+  completedAt:task.completedAt||task.completedDate,
+  createdAt:  task.createdAt  ||task.createdDate,
+});
+
+// ─── API ──────────────────────────────────────────────────────────────────────
+async function getEmployees() {
+  const res=await fetch(`${API_URL}/employee/get/employee`);
+  if(!res.ok) throw new Error(`Employees ${res.status}`);
+  const d=await res.json();
+  return Array.isArray(d)?d:d.employees||d.data||[];
+}
+async function getTasksForEmployee(empId) {
+  try {
+    const res=await fetch(`${API_URL}/employee/${empId}/tasks`);
+    if(!res.ok) return [];
+    const d=await res.json();
+    if(d.success&&d.employee?.tasks) return d.employee.tasks;
+    return Array.isArray(d)?d:d.tasks||[];
+  } catch { return []; }
+}
+
+// ─── SKELETONS ────────────────────────────────────────────────────────────────
+const Pulse=({className=""})=><div className={`rounded bg-gradient-to-r from-gray-100 via-gray-200 to-gray-100 animate-pulse ${className}`}/>;
+const StatSkeleton=()=>(
+  <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm space-y-2">
+    <Pulse className="h-7 w-10"/><Pulse className="h-3 w-20"/>
+  </div>
+);
+const RowSkeleton=()=>(
+  <tr className="border-b border-gray-50">
+    <td className="px-5 py-4"><Pulse className="h-3.5 w-48 mb-2"/><Pulse className="h-2.5 w-64 mb-2"/><Pulse className="h-5 w-16 rounded-full"/></td>
+    <td className="px-5 py-4"><div className="flex items-center gap-3"><Pulse className="w-8 h-8 rounded-full"/><div className="space-y-1.5"><Pulse className="h-3 w-28"/><Pulse className="h-2.5 w-36"/></div></div></td>
+    <td className="px-5 py-4"><Pulse className="h-5 w-20 rounded-full mb-2"/><Pulse className="h-5 w-16 rounded-full"/></td>
+    <td className="px-5 py-4"><Pulse className="h-2.5 w-24 rounded-full"/></td>
+    <td className="px-5 py-4"><Pulse className="h-3 w-20 mb-1.5"/><Pulse className="h-3 w-24"/></td>
+    <td className="px-5 py-4"><Pulse className="h-7 w-7 rounded mx-auto"/></td>
+  </tr>
+);
+
+// ─── SHARED COMPONENTS ────────────────────────────────────────────────────────
+const Badge=memo(({cls="",children})=>(
+  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${cls}`}>{children}</span>
+));
+
+const Modal=memo(({children,onClose,title,wide=false})=>(
+  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div className={`bg-white rounded-2xl shadow-2xl w-full max-h-[90vh] overflow-y-auto ${wide?"max-w-2xl":"max-w-md"}`}>
+      <div className="sticky top-0 bg-white px-6 pt-5 pb-3 border-b border-gray-100 flex justify-between items-center rounded-t-2xl z-10">
+        <h3 className="text-base font-semibold text-gray-800">{title}</h3>
+        <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100"><X className="w-4 h-4"/></button>
+      </div>
+      <div className="px-6 py-5">{children}</div>
+    </div>
+  </div>
+));
+
+// ─── PORTAL DROPDOWN ─────────────────────────────────────────────────────────
+// Renders into document.body → never clipped by table's overflow:hidden
+const DropdownPortal=({anchorRef,isOpen,onClose,children})=>{
+  const [pos,setPos]=useState({top:0,left:0});
+
+  useEffect(()=>{
+    if(!isOpen||!anchorRef.current) return;
+    const r=anchorRef.current.getBoundingClientRect();
+    setPos({ top:r.bottom+window.scrollY+4, left:Math.max(8,r.right+window.scrollX-176) });
+  },[isOpen,anchorRef]);
+
+  useEffect(()=>{
+    if(!isOpen) return;
+    const h=(e)=>{ if(anchorRef.current&&!anchorRef.current.contains(e.target)) onClose(); };
+    const id=setTimeout(()=>document.addEventListener("mousedown",h),0);
+    return ()=>{ clearTimeout(id); document.removeEventListener("mousedown",h); };
+  },[isOpen,onClose,anchorRef]);
+
+  if(!isOpen) return null;
+  return ReactDOM.createPortal(
+    <div style={{position:"absolute",top:pos.top,left:pos.left,zIndex:9999}}
+      className="w-44 bg-white border border-gray-100 rounded-xl shadow-2xl py-1 text-sm"
+      onMouseDown={e=>e.stopPropagation()}>
+      {children}
+    </div>,
+    document.body
+  );
 };
 
-const STATUS_ICONS = {
-    pending: <Clock className="w-3 h-3 text-gray-600" />,
-    "in progress": <PlayCircle className="w-3 h-3 text-blue-600" />,
-    completed: <CheckCircle className="w-3 h-3 text-green-600" />,
-    "on hold": <PauseCircle className="w-3 h-3 text-purple-600" />
-};
-
-const TYPE_COLORS = {
-    Daily: "bg-indigo-100 text-indigo-800 border border-indigo-200",
-    Weekly: "bg-pink-100 text-pink-800 border border-pink-200",
-    Monthly: "bg-teal-100 text-teal-800 border border-teal-200",
-    Project: "bg-amber-100 text-amber-800 border border-amber-200"
-};
-
-const TaskAdmin = () => {
-    const [tasks, setTasks] = useState([]);
-    const [employees, setEmployees] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-    const [selectedTask, setSelectedTask] = useState(null);
-    const [showTaskDetails, setShowTaskDetails] = useState(false);
-    const [activeDropdown, setActiveDropdown] = useState(null);
-
-    // Filters
-    const [filters, setFilters] = useState({
-        search: "",
-        employee: "",
-        status: "",
-        priority: "",
-        type: ""
-    });
-
-    // New task form
-    const [newTask, setNewTask] = useState({
-        title: "",
-        description: "",
-        type: "Daily",
-        priority: "medium",
-        progress: 0,
-        employeeId: "",
-        dueDate: "",
-        notes: ""
-    });
-
-    const [showAddTask, setShowAddTask] = useState(false);
-
-    // Fetch employees
-    const fetchEmployees = async () => {
-        try {
-            const employeesRes = await fetch(`${API_URL}/employee/get/employee`, {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            });
-
-            let employeesData = [];
-            if (employeesRes.ok) {
-                const data = await employeesRes.json();
-                employeesData = data.employees || data || [];
-                console.log("Employees loaded:", employeesData.length);
-                setEmployees(employeesData);
-                return employeesData;
-            } else {
-                const altRes = await fetch(`${API_URL}/employee`);
-                if (altRes.ok) {
-                    const altData = await altRes.json();
-                    employeesData = altData.employees || altData || [];
-                    console.log("Employees from alternative endpoint:", employeesData.length);
-                    setEmployees(employeesData);
-                    return employeesData;
-                } else {
-                    throw new Error(`Failed to fetch employees: ${employeesRes.status}`);
-                }
-            }
-        } catch (err) {
-            console.error("Error fetching employees:", err);
-            toast.error("Failed to load employees");
-            return [];
-        }
-    };
-
-    // Fetch tasks for a specific employee
-    const fetchEmployeeTasks = async (employeeId) => {
-        try {
-            const res = await fetch(`${API_URL}/employee/${employeeId}/tasks`);
-            if (!res.ok) throw new Error(`Failed to fetch tasks for employee ${employeeId}`);
-            
-            const data = await res.json();
-            if (data.success && data.employee && data.employee.tasks) {
-                return data.employee.tasks;
-            }
-            return [];
-        } catch (err) {
-            console.warn(`Error fetching tasks for employee ${employeeId}:`, err);
-            return [];
-        }
-    };
-
-    // Fetch all tasks using the new endpoint structure
-    const fetchAllTasks = async (employeesData) => {
-        let allTasks = [];
-        
-        // Fetch tasks for each employee
-        for (const employee of employeesData) {
-            try {
-                const employeeTasks = await fetchEmployeeTasks(employee._id);
-                
-                // Enrich tasks with employee information
-                const enrichedTasks = employeeTasks.map(task => {
-                    // Handle different field names for dates
-                    const lastUpdated = task.lastUpdated || task.updatedAt || task.updatedDate;
-                    const dueDate = task.dueDate || task.due;
-                    const completedAt = task.completedAt || task.completedDate;
-                    const createdAt = task.createdAt || task.createdDate;
-                    
-                    return {
-                        ...task,
-                        employeeId: {
-                            _id: employee._id,
-                            name: employee.name,
-                            email: employee.email,
-                            position: employee.position,
-                            department: employee.department
-                        },
-                        lastUpdated,
-                        dueDate,
-                        completedAt,
-                        createdAt
-                    };
-                });
-                
-                allTasks = [...allTasks, ...enrichedTasks];
-            } catch (err) {
-                console.warn(`Skipping employee ${employee._id}:`, err);
-            }
-        }
-        
-        return allTasks;
-    };
-
-    // Fetch all data - UPDATED TO USE NEW ENDPOINT
-    const fetchAllData = async () => {
-        setLoading(true);
-        setError(null);
-
-        try {
-            console.log("Starting data fetch...");
-
-            // Fetch employees first
-            const employeesData = await fetchEmployees();
-            if (employeesData.length === 0) {
-                throw new Error("No employees found");
-            }
-
-            // Fetch all tasks using the new endpoint structure
-            const allTasks = await fetchAllTasks(employeesData);
-
-            console.log("Total tasks loaded:", allTasks.length);
-            if (allTasks.length > 0) {
-                console.log("Sample task:", allTasks[0]);
-            }
-            
-            setTasks(allTasks);
-
-        } catch (err) {
-            console.error("Fetch error:", err);
-            setError(err.message);
-            toast.error(`Failed to load data: ${err.message}`);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    // Fetch tasks for a specific employee when filter changes
-    const fetchTasksByEmployee = async (employeeId) => {
-        if (!employeeId) {
-            // If no employee selected, fetch all tasks
-            fetchAllData();
-            return;
-        }
-
-        setLoading(true);
-        try {
-            const employee = employees.find(emp => emp._id === employeeId);
-            if (!employee) {
-                toast.error("Employee not found");
-                return;
-            }
-
-            const employeeTasks = await fetchEmployeeTasks(employeeId);
-            
-            // Enrich tasks with employee information
-            const enrichedTasks = employeeTasks.map(task => {
-                const lastUpdated = task.lastUpdated || task.updatedAt || task.updatedDate;
-                const dueDate = task.dueDate || task.due;
-                const completedAt = task.completedAt || task.completedDate;
-                const createdAt = task.createdAt || task.createdDate;
-                
-                return {
-                    ...task,
-                    employeeId: {
-                        _id: employee._id,
-                        name: employee.name,
-                        email: employee.email,
-                        position: employee.position,
-                        department: employee.department
-                    },
-                    lastUpdated,
-                    dueDate,
-                    completedAt,
-                    createdAt
-                };
-            });
-
-            setTasks(enrichedTasks);
-            toast.success(`Showing tasks for ${employee.name}`);
-        } catch (err) {
-            console.error("Error fetching employee tasks:", err);
-            toast.error("Failed to load employee tasks");
-            fetchAllData(); // Fall back to all tasks
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    useEffect(() => {
-        fetchAllData();
-    }, []);
-
-    // Handle employee filter change
-    const handleEmployeeFilterChange = (employeeId) => {
-        setFilters({ ...filters, employee: employeeId });
-        
-        if (employeeId) {
-            fetchTasksByEmployee(employeeId);
-        } else {
-            fetchAllData();
-        }
-    };
-
-    // Filter tasks - SIMPLIFIED FOR EMPLOYEE FILTER
-    const filteredTasks = tasks.filter(task => {
-        const matchesSearch = !filters.search ||
-            task.title?.toLowerCase().includes(filters.search.toLowerCase()) ||
-            task.description?.toLowerCase().includes(filters.search.toLowerCase()) ||
-            (task.employeeId && typeof task.employeeId === 'object' && 
-             task.employeeId.name?.toLowerCase().includes(filters.search.toLowerCase())) ||
-            task.notes?.toLowerCase().includes(filters.search.toLowerCase());
-
-        // Employee filter is already handled by fetchTasksByEmployee
-        // but we still check here for consistency
-        const matchesEmployee = !filters.employee || 
-            (task.employeeId && task.employeeId._id === filters.employee);
-
-        const matchesStatus = !filters.status || 
-            (task.status?.toLowerCase() === filters.status.toLowerCase());
-        
-        const matchesPriority = !filters.priority || 
-            task.priority === filters.priority;
-        
-        const matchesType = !filters.type || 
-            task.type === filters.type;
-
-        return matchesSearch && matchesEmployee && matchesStatus && matchesPriority && matchesType;
-    });
-
-    // Get employee name for display
-    const getEmployeeName = (employeeId) => {
-        if (!employeeId) return "Unassigned";
-        
-        if (typeof employeeId === 'object' && employeeId.name) {
-            return employeeId.name;
-        }
-        
-        if (typeof employeeId === 'string') {
-            const employee = employees.find(emp => emp._id === employeeId);
-            return employee ? employee.name : "Unknown";
-        }
-        
-        return "Unassigned";
-    };
-
-    // Get employee object for display
-    const getEmployeeObject = (employeeId) => {
-        if (!employeeId) return null;
-        
-        if (typeof employeeId === 'object' && employeeId._id) {
-            return employeeId;
-        }
-        
-        if (typeof employeeId === 'string') {
-            return employees.find(emp => emp._id === employeeId);
-        }
-        
-        return null;
-    };
-
-    // Clear filters
-    const clearFilters = () => {
-        setFilters({
-            search: "",
-            employee: "",
-            status: "",
-            priority: "",
-            type: ""
-        });
-        fetchAllData(); // Reset to show all tasks
-        toast.success("Filters cleared");
-    };
-
-    // Add new task
-    const handleAddTask = async () => {
-        if (!newTask.title.trim()) {
-            toast.error("Title is required");
-            return;
-        }
-
-        if (!newTask.employeeId) {
-            toast.error("Please select an employee");
-            return;
-        }
-
-        try {
-            const res = await fetch(`${API_URL}/employee/task`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(newTask)
-            });
-
-            const data = await res.json();
-
-            if (!res.ok) throw new Error(data.message || "Failed to add task");
-
-            // Find the employee data to enrich the new task
-            const employee = employees.find(emp => emp._id === newTask.employeeId);
-            const enrichedTask = {
-                ...data.task,
-                employeeId: employee || newTask.employeeId,
-                lastUpdated: data.task.lastUpdated || data.task.updatedAt || new Date().toISOString(),
-                dueDate: data.task.dueDate || data.task.due,
-                createdAt: data.task.createdAt || data.task.createdDate || new Date().toISOString(),
-                completedAt: data.task.completedAt || data.task.completedDate
-            };
-
-            setTasks(prev => [enrichedTask, ...prev]);
-            setNewTask({
-                title: "",
-                description: "",
-                type: "Daily",
-                priority: "medium",
-                progress: 0,
-                employeeId: "",
-                dueDate: "",
-                notes: ""
-            });
-            setShowAddTask(false);
-            toast.success("Task added successfully!");
-        } catch (err) {
-            toast.error(err.message);
-        }
-    };
-
-    // Update task
-    const handleUpdateTask = async (taskId, updates) => {
-        try {
-            const res = await fetch(`${API_URL}/employee/task/${taskId}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(updates)
-            });
-
-            const data = await res.json();
-
-            if (!res.ok) throw new Error(data.message || "Failed to update task");
-
-            // Get current date for lastUpdated
-            const currentDate = new Date().toISOString();
-            
-            setTasks(prev => prev.map(task => {
-                if (task._id === taskId) {
-                    const employeeData = task.employeeId;
-                    return { 
-                        ...task, 
-                        ...updates,
-                        employeeId: employeeData,
-                        lastUpdated: currentDate
-                    };
-                }
-                return task;
-            }));
-            
-            setActiveDropdown(null);
-            toast.success("Task updated successfully!");
-        } catch (err) {
-            toast.error(err.message);
-        }
-    };
-
-    // Delete task
-    const handleDeleteTask = async (taskId) => {
-        if (!window.confirm("Are you sure you want to delete this task?")) return;
-
-        try {
-            const res = await fetch(`${API_URL}/employee/task/${taskId}`, {
-                method: "DELETE"
-            });
-
-            if (!res.ok) throw new Error("Failed to delete task");
-
-            setTasks(prev => prev.filter(task => task._id !== taskId));
-            setActiveDropdown(null);
-            toast.success("Task deleted successfully!");
-        } catch (err) {
-            toast.error(err.message);
-        }
-    };
-
-    // View task details
-    const handleViewDetails = (task) => {
-        setSelectedTask(task);
-        setShowTaskDetails(true);
-        setActiveDropdown(null);
-    };
-
-    // Export tasks
-    const exportTasks = () => {
-        if (filteredTasks.length === 0) {
-            toast.error("No tasks to export");
-            return;
-        }
-
-        const exportData = filteredTasks.map(task => {
-            const employee = getEmployeeObject(task.employeeId);
-            return {
-                "Task ID": task._id,
-                "Title": task.title,
-                "Description": task.description,
-                "Employee": employee ? employee.name : "Unassigned",
-                "Email": employee ? employee.email : "N/A",
-                "Department": employee ? employee.department : "N/A",
-                "Position": employee ? employee.position : "N/A",
-                "Status": task.status,
-                "Priority": task.priority,
-                "Type": task.type,
-                "Progress": `${task.progress}%`,
-                "Due Date": task.dueDate ? new Date(task.dueDate).toLocaleDateString() : "N/A",
-                "Created": task.createdAt ? new Date(task.createdAt).toLocaleDateString() : "N/A",
-                "Last Updated": task.lastUpdated ? new Date(task.lastUpdated).toLocaleDateString() : "N/A",
-                "Completed At": task.completedAt ? new Date(task.completedAt).toLocaleDateString() : "N/A",
-                "Notes": task.notes || "N/A"
-            };
-        });
-
-        const csvHeaders = Object.keys(exportData[0]).join(",");
-        const csvRows = exportData.map(row =>
-            Object.values(row).map(value => `"${String(value).replace(/"/g, '""')}"`).join(",")
-        ).join("\n");
-
-        const csvContent = [csvHeaders, ...csvRows].join("\n");
-        const blob = new Blob([csvContent], { type: "text/csv" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `all-tasks-${new Date().toISOString().split('T')[0]}.csv`;
-        a.click();
-        URL.revokeObjectURL(url);
-
-        toast.success("Tasks exported successfully!");
-    };
-
-    // Format date
-    const formatDate = (dateString) => {
-        if (!dateString) return "N/A";
-        
-        try {
-            const date = new Date(dateString);
-            if (isNaN(date.getTime())) return "N/A";
-            
-            return date.toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'short',
-                day: 'numeric'
-            });
-        } catch (err) {
-            console.warn("Error formatting date:", dateString, err);
-            return "N/A";
-        }
-    };
-
-    // Format datetime
-    const formatDateTime = (dateString) => {
-        if (!dateString) return "N/A";
-        
-        try {
-            const date = new Date(dateString);
-            if (isNaN(date.getTime())) return "N/A";
-            
-            return date.toLocaleString('en-US', {
-                year: 'numeric',
-                month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-            });
-        } catch (err) {
-            console.warn("Error formatting datetime:", dateString, err);
-            return "N/A";
-        }
-    };
-
-    // Calculate task statistics
-    const taskStats = {
-        total: tasks.length,
-        completed: tasks.filter(t => t.status?.toLowerCase() === 'completed').length,
-        inProgress: tasks.filter(t => t.status?.toLowerCase() === 'in progress').length,
-        pending: tasks.filter(t => t.status?.toLowerCase() === 'pending').length,
-        onHold: tasks.filter(t => t.status?.toLowerCase() === 'on hold').length,
-        urgent: tasks.filter(t => t.priority === 'urgent').length,
-        highPriority: tasks.filter(t => t.priority === 'high').length
-    };
-
-    return (
-        <>
-            <Toaster position="top-right" />
-
-            {/* Task Details Modal */}
-            {showTaskDetails && selectedTask && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-xl font-semibold text-gray-800">Task Details</h3>
-                            <button
-                                onClick={() => setShowTaskDetails(false)}
-                                className="text-gray-500 hover:text-gray-700"
-                            >
-                                ✕
-                            </button>
-                        </div>
-
-                        <div className="space-y-4">
-                            {/* Basic Info */}
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700">Title</label>
-                                    <p className="mt-1 text-sm text-gray-900">{selectedTask.title}</p>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700">Status</label>
-                                    <div className="mt-1">
-                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[selectedTask.status?.toLowerCase()] || "bg-gray-100 text-gray-800"}`}>
-                                            {STATUS_ICONS[selectedTask.status?.toLowerCase()] || <Clock className="w-3 h-3 mr-1" />}
-                                            {selectedTask.status || "Pending"}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Description */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Description</label>
-                                <p className="mt-1 text-sm text-gray-900 whitespace-pre-wrap">
-                                    {selectedTask.description || "No description provided"}
-                                </p>
-                            </div>
-
-                            {/* Employee Info */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Assigned To</label>
-                                {selectedTask.employeeId ? (
-                                    <div className="mt-1 flex items-center space-x-3">
-                                        <Users className="w-5 h-5 text-gray-400" />
-                                        <div>
-                                            <p className="text-sm font-medium text-gray-900">
-                                                {getEmployeeName(selectedTask.employeeId)}
-                                            </p>
-                                            {getEmployeeObject(selectedTask.employeeId) && (
-                                                <>
-                                                    <p className="text-sm text-gray-500">
-                                                        {getEmployeeObject(selectedTask.employeeId).email}
-                                                    </p>
-                                                    <p className="text-xs text-gray-400">
-                                                        {getEmployeeObject(selectedTask.employeeId).position} • {getEmployeeObject(selectedTask.employeeId).department}
-                                                    </p>
-                                                </>
-                                            )}
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <p className="mt-1 text-sm text-gray-500">Unassigned</p>
-                                )}
-                            </div>
-
-                            {/* Task Metadata */}
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700">Type</label>
-                                    <span className={`mt-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${TYPE_COLORS[selectedTask.type] || "bg-gray-100 text-gray-800"}`}>
-                                        {selectedTask.type}
-                                    </span>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700">Priority</label>
-                                    <div className="mt-1">
-                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${PRIORITY_COLORS[selectedTask.priority] || "bg-gray-100 text-gray-800"}`}>
-                                            {PRIORITY_ICONS[selectedTask.priority] || <Flag className="w-3 h-3 mr-1" />}
-                                            {selectedTask.priority ? selectedTask.priority.charAt(0).toUpperCase() + selectedTask.priority.slice(1) : "Medium"}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Progress */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">
-                                    Progress: {selectedTask.progress || 0}%
-                                </label>
-                                <div className="mt-1 w-full bg-gray-200 rounded-full h-2">
-                                    <div
-                                        className="bg-green-600 h-2 rounded-full transition-all duration-300"
-                                        style={{ width: `${selectedTask.progress || 0}%` }}
-                                    ></div>
-                                </div>
-                            </div>
-
-                            {/* Dates */}
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700">Due Date</label>
-                                    <p className="mt-1 text-sm text-gray-900 flex items-center">
-                                        <Calendar className="w-4 h-4 mr-1" />
-                                        {formatDate(selectedTask.dueDate) || "No due date"}
-                                    </p>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700">Created</label>
-                                    <p className="mt-1 text-sm text-gray-900">{formatDateTime(selectedTask.createdAt)}</p>
-                                </div>
-                            </div>
-
-                            {/* Additional Dates */}
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700">Last Updated</label>
-                                    <p className="mt-1 text-sm text-gray-900">{formatDateTime(selectedTask.lastUpdated)}</p>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700">Completed At</label>
-                                    <p className="mt-1 text-sm text-gray-900">{formatDateTime(selectedTask.completedAt)}</p>
-                                </div>
-                            </div>
-
-                            {/* Notes */}
-                            {selectedTask.notes && (
-                                <div>
-                                    <label className="text-sm font-medium text-gray-700 flex items-center">
-                                        <MessageSquare className="w-4 h-4 mr-1" />
-                                        Notes
-                                    </label>
-                                    <p className="mt-1 text-sm text-gray-900 whitespace-pre-wrap bg-gray-50 p-3 rounded-lg">
-                                        {selectedTask.notes}
-                                    </p>
-                                </div>
-                            )}
-
-                            {/* Task ID */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Task ID</label>
-                                <p className="mt-1 text-sm text-gray-500 font-mono">{selectedTask._id}</p>
-                            </div>
-                        </div>
-
-                        <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-200">
-                            <button
-                                onClick={() => setShowTaskDetails(false)}
-                                className="px-4 py-2 text-gray-600 hover:text-gray-800"
-                            >
-                                Close
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Main Component */}
-            <div className="p-6 max-w-7xl mx-auto space-y-6">
-
-                {/* Header */}
-                <div className="flex justify-between items-center">
-                    <h2 className="text-3xl font-bold text-gray-800 flex items-center gap-3">
-                        <FileText className="w-8 h-8 text-purple-600" />
-                        Task Administration
-                        <span className="text-sm bg-green-100 text-green-800 px-2 py-1 rounded-full">
-                            Public Access
-                        </span>
-                    </h2>
-                    <div className="flex gap-3">
-                        <button
-                            onClick={() => setShowAddTask(true)}
-                            className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 flex items-center gap-2"
-                        >
-                            <Plus className="w-4 h-4" />
-                            Add Task
-                        </button>
-                        <button
-                            onClick={fetchAllData}
-                            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
-                            disabled={loading}
-                        >
-                            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                            Refresh
-                        </button>
-                        <button
-                            onClick={exportTasks}
-                            disabled={filteredTasks.length === 0}
-                            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center gap-2 disabled:bg-gray-400 disabled:cursor-not-allowed"
-                        >
-                            <Download className="w-4 h-4" />
-                            Export CSV
-                        </button>
-                    </div>
-                </div>
-
-                {/* Debug Info */}
-                {error && (
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <h4 className="text-red-800 font-semibold">Error Details:</h4>
-                                <p className="text-red-600 text-sm">{error}</p>
-                            </div>
-                            <button
-                                onClick={() => setError(null)}
-                                className="text-red-600 hover:text-red-800"
-                            >
-                                ✕
-                            </button>
-                        </div>
-                    </div>
-                )}
-
-                {/* Enhanced Stats */}
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-                    <div className="bg-white p-4 rounded-lg shadow border border-gray-200">
-                        <div className="text-2xl font-bold text-purple-600">{taskStats.total}</div>
-                        <div className="text-sm text-gray-600">Total Tasks</div>
-                    </div>
-                    <div className="bg-white p-4 rounded-lg shadow border border-gray-200">
-                        <div className="text-2xl font-bold text-green-600">{taskStats.completed}</div>
-                        <div className="text-sm text-gray-600">Completed</div>
-                    </div>
-                    <div className="bg-white p-4 rounded-lg shadow border border-gray-200">
-                        <div className="text-2xl font-bold text-blue-600">{taskStats.inProgress}</div>
-                        <div className="text-sm text-gray-600">In Progress</div>
-                    </div>
-                    <div className="bg-white p-4 rounded-lg shadow border border-gray-200">
-                        <div className="text-2xl font-bold text-orange-600">{taskStats.pending}</div>
-                        <div className="text-sm text-gray-600">Pending</div>
-                    </div>
-                    <div className="bg-white p-4 rounded-lg shadow border border-gray-200">
-                        <div className="text-2xl font-bold text-purple-600">{taskStats.onHold}</div>
-                        <div className="text-sm text-gray-600">On Hold</div>
-                    </div>
-                    <div className="bg-white p-4 rounded-lg shadow border border-gray-200">
-                        <div className="text-2xl font-bold text-red-600">{taskStats.urgent}</div>
-                        <div className="text-sm text-gray-600">Urgent</div>
-                    </div>
-                    <div className="bg-white p-4 rounded-lg shadow border border-gray-200">
-                        <div className="text-2xl font-bold text-orange-600">{taskStats.highPriority}</div>
-                        <div className="text-sm text-gray-600">High Priority</div>
-                    </div>
-                </div>
-
-                {/* Add Task Modal */}
-                {showAddTask && (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                        <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
-                            <h3 className="text-xl font-semibold mb-4 text-gray-800">Add New Task</h3>
-                            <div className="space-y-4">
-                                <input
-                                    type="text"
-                                    placeholder="Task Title *"
-                                    value={newTask.title}
-                                    onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
-                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
-                                />
-                                <textarea
-                                    placeholder="Description"
-                                    value={newTask.description}
-                                    onChange={(e) => setNewTask({ ...newTask, description: e.target.value })}
-                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
-                                    rows="3"
-                                />
-                                <select
-                                    value={newTask.employeeId}
-                                    onChange={(e) => setNewTask({ ...newTask, employeeId: e.target.value })}
-                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
-                                >
-                                    <option value="">Select Employee *</option>
-                                    {employees.map(emp => (
-                                        <option key={emp._id} value={emp._id}>
-                                            {emp.name} ({emp.department})
-                                        </option>
-                                    ))}
-                                </select>
-                                <select
-                                    value={newTask.type}
-                                    onChange={(e) => setNewTask({ ...newTask, type: e.target.value })}
-                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
-                                >
-                                    <option value="Daily">Daily</option>
-                                    <option value="Weekly">Weekly</option>
-                                    <option value="Monthly">Monthly</option>
-                                    <option value="Project">Project</option>
-                                </select>
-                                <select
-                                    value={newTask.priority}
-                                    onChange={(e) => setNewTask({ ...newTask, priority: e.target.value })}
-                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
-                                >
-                                    <option value="low">Low</option>
-                                    <option value="medium">Medium</option>
-                                    <option value="high">High</option>
-                                    <option value="urgent">Urgent</option>
-                                </select>
-                                <input
-                                    type="date"
-                                    value={newTask.dueDate}
-                                    onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })}
-                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
-                                />
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                                        Progress: {newTask.progress}%
-                                    </label>
-                                    <input
-                                        type="range"
-                                        value={newTask.progress}
-                                        onChange={(e) => setNewTask({ ...newTask, progress: parseInt(e.target.value) })}
-                                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                                        min="0"
-                                        max="100"
-                                    />
-                                </div>
-                                <textarea
-                                    placeholder="Notes (optional)"
-                                    value={newTask.notes}
-                                    onChange={(e) => setNewTask({ ...newTask, notes: e.target.value })}
-                                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
-                                    rows="2"
-                                />
-                            </div>
-                            <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-200">
-                                <button
-                                    onClick={() => setShowAddTask(false)}
-                                    className="px-4 py-2 text-gray-600 hover:text-gray-800"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={handleAddTask}
-                                    className="bg-purple-600 text-white px-6 py-2 rounded-lg hover:bg-purple-700"
-                                >
-                                    Add Task
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* Filters */}
-                <div className="bg-white p-6 rounded-lg shadow-md border border-gray-200">
-                    <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-lg font-semibold text-gray-700 flex items-center gap-2">
-                            <Filter className="w-5 h-5" />
-                            Filters
-                        </h3>
-                        <button
-                            onClick={clearFilters}
-                            className="text-sm text-gray-600 hover:text-gray-800"
-                        >
-                            Clear All
-                        </button>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-                        {/* Search */}
-                        <div className="relative">
-                            <Search className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
-                            <input
-                                type="text"
-                                placeholder="Search tasks..."
-                                value={filters.search}
-                                onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-                                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
-                            />
-                        </div>
-
-                        {/* Employee Filter - UPDATED */}
-                        <select
-                            value={filters.employee}
-                            onChange={(e) => handleEmployeeFilterChange(e.target.value)}
-                            className="p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
-                        >
-                            <option value="">All Employees</option>
-                            {employees.map(emp => (
-                                <option key={emp._id} value={emp._id}>
-                                    {emp.name} - {emp.department}
-                                </option>
-                            ))}
-                        </select>
-
-                        {/* Status Filter */}
-                        <select
-                            value={filters.status}
-                            onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-                            className="p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
-                        >
-                            <option value="">All Status</option>
-                            <option value="pending">Pending</option>
-                            <option value="in progress">In Progress</option>
-                            <option value="completed">Completed</option>
-                            <option value="on hold">On Hold</option>
-                        </select>
-
-                        {/* Priority Filter */}
-                        <select
-                            value={filters.priority}
-                            onChange={(e) => setFilters({ ...filters, priority: e.target.value })}
-                            className="p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
-                        >
-                            <option value="">All Priority</option>
-                            <option value="low">Low</option>
-                            <option value="medium">Medium</option>
-                            <option value="high">High</option>
-                            <option value="urgent">Urgent</option>
-                        </select>
-
-                        {/* Type Filter */}
-                        <select
-                            value={filters.type}
-                            onChange={(e) => setFilters({ ...filters, type: e.target.value })}
-                            className="p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
-                        >
-                            <option value="">All Types</option>
-                            <option value="Daily">Daily</option>
-                            <option value="Weekly">Weekly</option>
-                            <option value="Monthly">Monthly</option>
-                            <option value="Project">Project</option>
-                        </select>
-                    </div>
-                </div>
-
-                {/* Enhanced Tasks Table */}
-                <div className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
-                    {loading ? (
-                        <div className="p-8 text-center">
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto"></div>
-                            <p className="mt-2 text-gray-600">Loading tasks...</p>
-                        </div>
-                    ) : error ? (
-                        <div className="p-6 text-center text-red-600 bg-red-50">
-                            <p className="font-semibold">Error loading tasks</p>
-                            <p className="text-sm mt-1">{error}</p>
-                            <button
-                                onClick={fetchAllData}
-                                className="mt-3 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700"
-                            >
-                                Try Again
-                            </button>
-                        </div>
-                    ) : filteredTasks.length > 0 ? (
-                        <div className="overflow-x-auto">
-                            <table className="w-full">
-                                <thead className="bg-gray-50 border-b border-gray-200">
-                                    <tr>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Task Details
-                                        </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Employee
-                                        </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Status & Priority
-                                        </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Progress
-                                        </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Dates
-                                        </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Actions
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody className="bg-white divide-y divide-gray-200">
-                                    {filteredTasks.map((task) => {
-                                        const employee = getEmployeeObject(task.employeeId);
-                                        return (
-                                            <tr key={task._id} className="hover:bg-gray-50">
-                                                <td className="px-6 py-4">
-                                                    <div>
-                                                        <div className="text-sm font-semibold text-gray-900">
-                                                            {task.title}
-                                                        </div>
-                                                        {task.description && (
-                                                            <div className="text-sm text-gray-500 mt-1 line-clamp-2">
-                                                                {task.description}
-                                                            </div>
-                                                        )}
-                                                        <div className="flex items-center gap-2 mt-2">
-                                                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${TYPE_COLORS[task.type] || "bg-gray-100 text-gray-800"}`}>
-                                                                {task.type}
-                                                            </span>
-                                                            {task.notes && (
-                                                                <MessageSquare className="w-3 h-3 text-gray-400" title="Has notes" />
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    {employee ? (
-                                                        <div className="flex items-center space-x-3">
-                                                            <div className="flex-shrink-0">
-                                                                <Users className="w-8 h-8 text-gray-400" />
-                                                            </div>
-                                                            <div>
-                                                                <div className="text-sm font-medium text-gray-900">
-                                                                    {employee.name}
-                                                                </div>
-                                                                <div className="text-xs text-gray-500">
-                                                                    {employee.email}
-                                                                </div>
-                                                                <div className="text-xs text-gray-400">
-                                                                    {employee.department} • {employee.position}
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    ) : (
-                                                        <div className="text-sm text-gray-500 italic">Unassigned</div>
-                                                    )}
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="space-y-2">
-                                                        <div>
-                                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[task.status?.toLowerCase()] || "bg-gray-100 text-gray-800"}`}>
-                                                                {STATUS_ICONS[task.status?.toLowerCase()] || <Clock className="w-3 h-3 mr-1" />}
-                                                                {task.status || "Pending"}
-                                                            </span>
-                                                        </div>
-                                                        <div>
-                                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${PRIORITY_COLORS[task.priority] || "bg-gray-100 text-gray-800"}`}>
-                                                                {PRIORITY_ICONS[task.priority] || <Flag className="w-3 h-3 mr-1" />}
-                                                                {task.priority ? task.priority.charAt(0).toUpperCase() + task.priority.slice(1) : "Medium"}
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="flex items-center space-x-3">
-                                                        <div className="w-20 bg-gray-200 rounded-full h-2">
-                                                            <div
-                                                                className="bg-green-600 h-2 rounded-full transition-all duration-300"
-                                                                style={{ width: `${task.progress || 0}%` }}
-                                                            ></div>
-                                                        </div>
-                                                        <span className="text-sm font-medium text-gray-600">{task.progress || 0}%</span>
-                                                    </div>
-                                                    {task.completedAt && (
-                                                        <div className="text-xs text-gray-500 mt-1">
-                                                            Completed: {formatDate(task.completedAt)}
-                                                        </div>
-                                                    )}
-                                                </td>
-                                                <td className="px-6 py-4 text-sm text-gray-500">
-                                                    <div className="space-y-1">
-                                                        <div className="flex items-center">
-                                                            <Calendar className="w-3 h-3 mr-1" />
-                                                            Due: {formatDate(task.dueDate) || "No due date"}
-                                                        </div>
-                                                        <div>Created: {formatDate(task.createdAt)}</div>
-                                                        <div>Updated: {formatDate(task.lastUpdated) || formatDate(task.updatedAt) || "N/A"}</div>
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4 text-sm font-medium">
-                                                    <div className="relative">
-                                                        <button
-                                                            onClick={() => setActiveDropdown(activeDropdown === task._id ? null : task._id)}
-                                                            className="text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-100"
-                                                        >
-                                                            <MoreVertical className="w-4 h-4" />
-                                                        </button>
-
-                                                        {activeDropdown === task._id && (
-                                                            <div className="absolute right-0 mt-1 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-10">
-                                                                <div className="py-1">
-                                                                    <button
-                                                                        onClick={() => handleViewDetails(task)}
-                                                                        className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
-                                                                    >
-                                                                        <Eye className="w-4 h-4 mr-2" />
-                                                                        View Details
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={() => handleUpdateTask(task._id, { status: "completed", progress: 100 })}
-                                                                        className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
-                                                                    >
-                                                                        <CheckCircle className="w-4 h-4 mr-2" />
-                                                                        Mark Complete
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={() => handleDeleteTask(task._id)}
-                                                                        className="flex items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50 w-full text-left"
-                                                                    >
-                                                                        <Trash2 className="w-4 h-4 mr-2" />
-                                                                        Delete Task
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
-                    ) : (
-                        <div className="text-center py-12">
-                            <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                            <h3 className="text-lg font-semibold text-gray-600 mb-2">No tasks found</h3>
-                            <p className="text-gray-500">
-                                {filters.employee 
-                                    ? `No tasks found for selected employee.`
-                                    : filters.search || filters.status || filters.priority || filters.type
-                                    ? "No tasks match your filters. Try changing your filter criteria."
-                                    : "No tasks have been created yet."}
-                            </p>
-                            <button
-                                onClick={() => setShowAddTask(true)}
-                                className="mt-4 bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700"
-                            >
-                                Create First Task
-                            </button>
-                        </div>
-                    )}
-                </div>
-
-                {/* Summary */}
-                {filteredTasks.length > 0 && (
-                    <div className="bg-white p-4 rounded-lg shadow border border-gray-200">
-                        <div className="text-sm text-gray-600">
-                            Showing {filteredTasks.length} {filters.employee ? "employee" : ""} task{filteredTasks.length !== 1 ? 's' : ''}
-                            {filters.search && ` matching "${filters.search}"`}
-                            {filters.employee && ` for ${employees.find(e => e._id === filters.employee)?.name || "selected employee"}`}
-                            {filters.status && ` with status "${filters.status}"`}
-                            {filters.priority && ` with priority "${filters.priority}"`}
-                            {filters.type && ` of type "${filters.type}"`}
-                        </div>
-                    </div>
-                )}
+// ─── TASK ROW ─────────────────────────────────────────────────────────────────
+const TaskRow=memo(({task,activeDropdown,setActiveDropdown,onView,onComplete,onDelete})=>{
+  const emp    =typeof task.employeeId==="object"?task.employeeId:null;
+  const stMeta =STATUS_META[task.status?.toLowerCase()]||STATUS_META.pending;
+  const prMeta =PRIORITY_META[task.priority]||PRIORITY_META.medium;
+  const pct    =task.progress||0;
+  const btnRef =useRef(null);
+  const isOpen =activeDropdown===task._id;
+
+  const toggle=useCallback((e)=>{ e.stopPropagation(); setActiveDropdown(id=>id===task._id?null:task._id); },[task._id,setActiveDropdown]);
+  const close =useCallback(()=>setActiveDropdown(null),[setActiveDropdown]);
+
+  return (
+    <tr className="hover:bg-gray-50 transition-colors row-enter">
+      {/* Task */}
+      <td className="px-5 py-3.5 max-w-xs">
+        <p className="font-medium text-sm text-gray-900 truncate">{task.title}</p>
+        {task.description&&<p className="text-xs text-gray-400 mt-0.5 line-clamp-1">{task.description}</p>}
+        <div className="flex items-center gap-1.5 mt-1.5">
+          <Badge cls={TYPE_META[task.type]||"bg-gray-100 text-gray-600 border-gray-200"}>{task.type}</Badge>
+          {task.notes&&<MessageSquare className="w-3 h-3 text-gray-300" title="Has notes"/>}
+        </div>
+      </td>
+      {/* Employee */}
+      <td className="px-5 py-3.5">
+        {emp?(
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 shrink-0 rounded-full bg-gradient-to-br from-violet-400 to-indigo-500 flex items-center justify-center text-white text-xs font-bold">
+              {emp.name?.split(" ").map(n=>n[0]).join("").slice(0,2).toUpperCase()}
             </div>
-        </>
-    );
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-gray-800 truncate">{emp.name}</p>
+              <p className="text-xs text-gray-400 truncate">{emp.department} · {emp.position}</p>
+            </div>
+          </div>
+        ):<span className="text-xs text-gray-400 italic">Unassigned</span>}
+      </td>
+      {/* Status / Priority */}
+      <td className="px-5 py-3.5">
+        <div className="space-y-1.5">
+          <div><Badge cls={stMeta.cls}>{stMeta.icon}{task.status||"Pending"}</Badge></div>
+          <div><Badge cls={prMeta.cls}>{prMeta.icon}{task.priority?task.priority[0].toUpperCase()+task.priority.slice(1):"Medium"}</Badge></div>
+        </div>
+      </td>
+      {/* Progress */}
+      <td className="px-5 py-3.5">
+        <div className="flex items-center gap-2">
+          <div className="flex-1 bg-gray-100 rounded-full h-1.5">
+            <div className="bg-emerald-500 h-1.5 rounded-full transition-all duration-500" style={{width:`${pct}%`}}/>
+          </div>
+          <span className="text-xs font-medium text-gray-600 w-8 text-right">{pct}%</span>
+        </div>
+        {task.completedAt&&<p className="text-xs text-gray-400 mt-1">Done {fmtDate(task.completedAt)}</p>}
+      </td>
+      {/* Dates */}
+      <td className="px-5 py-3.5 text-xs text-gray-500 space-y-1">
+        <div className="flex items-center gap-1"><Calendar className="w-3 h-3 shrink-0"/>Due: {fmtDate(task.dueDate)}</div>
+        <div>Created: {fmtDate(task.createdAt)}</div>
+      </td>
+      {/* Actions */}
+      <td className="px-5 py-3.5 text-center">
+        <button ref={btnRef} onClick={toggle}
+          className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+          <MoreVertical className="w-4 h-4"/>
+        </button>
+        <DropdownPortal anchorRef={btnRef} isOpen={isOpen} onClose={close}>
+          <button onClick={()=>{onView();close();}} className="flex items-center gap-2 px-3 py-2 w-full text-left text-gray-700 hover:bg-gray-50">
+            <Eye className="w-3.5 h-3.5"/> View Details
+          </button>
+          <button onClick={()=>{onComplete();close();}} className="flex items-center gap-2 px-3 py-2 w-full text-left text-emerald-600 hover:bg-emerald-50">
+            <CheckCircle className="w-3.5 h-3.5"/> Mark Complete
+          </button>
+          <div className="h-px bg-gray-100 my-1 mx-2"/>
+          <button onClick={()=>{onDelete();close();}} className="flex items-center gap-2 px-3 py-2 w-full text-left text-red-500 hover:bg-red-50">
+            <Trash2 className="w-3.5 h-3.5"/> Delete
+          </button>
+        </DropdownPortal>
+      </td>
+    </tr>
+  );
+});
+
+// ─── TASK DETAIL CONTENT ──────────────────────────────────────────────────────
+const TaskDetailContent=memo(({task})=>{
+  const emp    =typeof task.employeeId==="object"?task.employeeId:null;
+  const stMeta =STATUS_META[task.status?.toLowerCase()]||STATUS_META.pending;
+  const prMeta =PRIORITY_META[task.priority]||PRIORITY_META.medium;
+  const pct    =task.progress||0;
+  return (
+    <div className="space-y-5 text-sm">
+      <div className="grid grid-cols-2 gap-4">
+        <div><p className="text-xs text-gray-400 mb-1">Title</p><p className="font-medium text-gray-800">{task.title}</p></div>
+        <div><p className="text-xs text-gray-400 mb-1">Status</p><Badge cls={stMeta.cls}>{stMeta.icon}{task.status||"Pending"}</Badge></div>
+      </div>
+      {task.description&&<div><p className="text-xs text-gray-400 mb-1">Description</p><p className="text-gray-700 bg-gray-50 p-3 rounded-lg text-xs leading-relaxed">{task.description}</p></div>}
+      {emp&&(
+        <div><p className="text-xs text-gray-400 mb-2">Assigned To</p>
+          <div className="flex items-center gap-3 bg-gray-50 p-3 rounded-lg">
+            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-violet-400 to-indigo-500 flex items-center justify-center text-white text-sm font-bold">
+              {emp.name?.split(" ").map(n=>n[0]).join("").slice(0,2).toUpperCase()}
+            </div>
+            <div>
+              <p className="font-medium text-gray-800">{emp.name}</p>
+              <p className="text-xs text-gray-500">{emp.email}</p>
+              <p className="text-xs text-gray-400">{emp.position} · {emp.department}</p>
+            </div>
+          </div>
+        </div>
+      )}
+      <div className="grid grid-cols-2 gap-4">
+        <div><p className="text-xs text-gray-400 mb-1">Type</p><Badge cls={TYPE_META[task.type]||"bg-gray-100 text-gray-600 border-gray-200"}>{task.type}</Badge></div>
+        <div><p className="text-xs text-gray-400 mb-1">Priority</p><Badge cls={prMeta.cls}>{prMeta.icon}{task.priority?task.priority[0].toUpperCase()+task.priority.slice(1):"Medium"}</Badge></div>
+      </div>
+      <div>
+        <p className="text-xs text-gray-400 mb-1">Progress — {pct}%</p>
+        <div className="bg-gray-100 rounded-full h-2"><div className="bg-emerald-500 h-2 rounded-full" style={{width:`${pct}%`}}/></div>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        {[["Due Date",fmtDate(task.dueDate)],["Created",fmtDateTime(task.createdAt)],["Last Updated",fmtDateTime(task.lastUpdated)],["Completed",fmtDateTime(task.completedAt)]].map(([l,v])=>(
+          <div key={l}><p className="text-xs text-gray-400 mb-1">{l}</p><p className="text-gray-700">{v}</p></div>
+        ))}
+      </div>
+      {task.notes&&<div><p className="text-xs text-gray-400 mb-1 flex items-center gap-1"><MessageSquare className="w-3 h-3"/>Notes</p><p className="text-gray-700 bg-gray-50 p-3 rounded-lg text-xs leading-relaxed whitespace-pre-wrap">{task.notes}</p></div>}
+      <div><p className="text-xs text-gray-400 mb-1">Task ID</p><p className="font-mono text-xs text-gray-500">{task._id}</p></div>
+    </div>
+  );
+});
+
+// ─── ADD TASK FORM ────────────────────────────────────────────────────────────
+const AddTaskForm=memo(({task,setTask,employees,onSubmit,onCancel,iCls})=>{
+  const f=(key)=>({value:task[key]??"",onChange:e=>setTask(p=>({...p,[key]:e.target.value})),className:iCls});
+  return (
+    <div className="space-y-3">
+      <input type="text" placeholder="Task Title *" {...f("title")}/>
+      <textarea placeholder="Description" rows={3} {...f("description")} className={`${iCls} resize-none`}/>
+      <select {...f("employeeId")}>
+        <option value="">Select Employee *</option>
+        {employees.map(e=><option key={e._id} value={e._id}>{e.name} · {e.department}</option>)}
+      </select>
+      <div className="grid grid-cols-2 gap-3">
+        <select {...f("type")}>{["Daily","Weekly","Monthly","Project"].map(t=><option key={t} value={t}>{t}</option>)}</select>
+        <select {...f("priority")}>{["low","medium","high","urgent"].map(p=><option key={p} value={p}>{p[0].toUpperCase()+p.slice(1)}</option>)}</select>
+      </div>
+      <div>
+        <label className="text-xs text-gray-500 mb-1 block">Due Date</label>
+        <input type="date" {...f("dueDate")}/>
+      </div>
+      <div>
+        <label className="text-xs text-gray-500 mb-1 block">Progress: {task.progress}%</label>
+        <input type="range" min="0" max="100" value={task.progress} onChange={e=>setTask(p=>({...p,progress:+e.target.value}))} className="w-full accent-violet-500"/>
+      </div>
+      <textarea placeholder="Notes (optional)" rows={2} {...f("notes")} className={`${iCls} resize-none`}/>
+      <div className="flex justify-end gap-2 pt-2">
+        <button type="button" onClick={onCancel} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Cancel</button>
+        <button type="button" onClick={onSubmit} className="px-5 py-2 text-sm bg-violet-600 hover:bg-violet-700 text-white rounded-lg">Add Task</button>
+      </div>
+    </div>
+  );
+});
+
+// ─── MAIN ─────────────────────────────────────────────────────────────────────
+const TaskAdmin=()=>{
+  const [employees,      setEmployees]     =useState([]);
+  const [tasks,          setTasks]         =useState([]);
+  const [loadingPhase,   setLoadingPhase]  =useState("idle");
+  const [batchProgress,  setBatchProgress] =useState({done:0,total:0});
+  const [error,          setError]         =useState(null);
+  const [selectedTask,   setSelectedTask]  =useState(null);
+  const [showAddTask,    setShowAddTask]   =useState(false);
+  const [activeDropdown, setActiveDropdown]=useState(null);
+  const [newTask,        setNewTask]       =useState(EMPTY_TASK);
+  const [filters,setFilters]=useState({
+    search:"", employee:"", status:"", priority:"", type:"",
+    dueDateFrom:"", dueDateTo:"",
+  });
+
+  const abortRef        =useRef(null);
+  const debouncedSearch =useDebounce(filters.search);
+
+  // Fetch all
+  const fetchAll=useCallback(async()=>{
+    if(abortRef.current) abortRef.current.abort();
+    abortRef.current=new AbortController();
+    const signal=abortRef.current.signal;
+    setError(null); setTasks([]); setLoadingPhase("employees"); setBatchProgress({done:0,total:0});
+
+    let emps=[];
+    try { emps=await getEmployees(); if(signal.aborted)return; setEmployees(emps); }
+    catch(err){ if(!signal.aborted){setError(err.message);setLoadingPhase("idle");} return; }
+    if(!emps.length){setLoadingPhase("done");return;}
+
+    setLoadingPhase("tasks"); setBatchProgress({done:0,total:emps.length});
+    for(let i=0;i<emps.length;i+=BATCH_SZ){
+      if(signal.aborted)break;
+      await Promise.allSettled(emps.slice(i,i+BATCH_SZ).map(async emp=>{
+        const raw=await getTasksForEmployee(emp._id);
+        if(signal.aborted)return;
+        setTasks(prev=>[...prev,...raw.map(t=>enrichTask(t,emp))]);
+        setBatchProgress(p=>({...p,done:p.done+1}));
+      }));
+      if(i+BATCH_SZ<emps.length) await new Promise(r=>setTimeout(r,100));
+    }
+    if(!signal.aborted)setLoadingPhase("done");
+  },[]);
+
+  useEffect(()=>{fetchAll();return()=>abortRef.current?.abort();},[fetchAll]);
+
+  // Filtered tasks
+  const filteredTasks=useMemo(()=>{
+    const s=debouncedSearch.toLowerCase();
+    return tasks.filter(t=>{
+      const emp=typeof t.employeeId==="object"?t.employeeId:null;
+      const td=toDateStr(t.dueDate);
+      if(filters.dueDateFrom&&(!td||td<filters.dueDateFrom)) return false;
+      if(filters.dueDateTo  &&(!td||td>filters.dueDateTo))   return false;
+      return (
+        (!s||t.title?.toLowerCase().includes(s)||t.description?.toLowerCase().includes(s)||emp?.name?.toLowerCase().includes(s))&&
+        (!filters.employee||emp?._id===filters.employee)&&
+        (!filters.status  ||t.status?.toLowerCase()===filters.status)&&
+        (!filters.priority||t.priority===filters.priority)&&
+        (!filters.type    ||t.type===filters.type)
+      );
+    });
+  },[tasks,debouncedSearch,filters]);
+
+  // Stats
+  const stats=useMemo(()=>({
+    total:tasks.length,
+    completed:tasks.filter(t=>t.status?.toLowerCase()==="completed").length,
+    inProgress:tasks.filter(t=>t.status?.toLowerCase()==="in progress").length,
+    pending:tasks.filter(t=>t.status?.toLowerCase()==="pending").length,
+    onHold:tasks.filter(t=>t.status?.toLowerCase()==="on hold").length,
+    urgent:tasks.filter(t=>t.priority==="urgent").length,
+    high:tasks.filter(t=>t.priority==="high").length,
+  }),[tasks]);
+
+  const handleAddTask=useCallback(async()=>{
+    if(!newTask.title.trim()) return toast.error("Title is required");
+    if(!newTask.employeeId)   return toast.error("Select an employee");
+    try {
+      const res=await fetch(`${API_URL}/employee/task`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(newTask)});
+      const data=await res.json();
+      if(!res.ok) throw new Error(data.message||"Failed to add task");
+      const emp=employees.find(e=>e._id===newTask.employeeId);
+      setTasks(prev=>[enrichTask({...data.task,createdAt:new Date().toISOString()},emp||{_id:newTask.employeeId,name:"Unknown"}),...prev]);
+      setNewTask(EMPTY_TASK); setShowAddTask(false); toast.success("Task added!");
+    } catch(err){toast.error(err.message);}
+  },[newTask,employees]);
+
+  const handleUpdateTask=useCallback(async(taskId,updates)=>{
+    try {
+      const res=await fetch(`${API_URL}/employee/task/${taskId}`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify(updates)});
+      if(!res.ok) throw new Error("Update failed");
+      setTasks(prev=>prev.map(t=>t._id===taskId?{...t,...updates,lastUpdated:new Date().toISOString()}:t));
+      toast.success("Task updated!");
+    } catch(err){toast.error(err.message);}
+  },[]);
+
+  const handleDeleteTask=useCallback(async(taskId)=>{
+    if(!window.confirm("Delete this task?")) return;
+    try {
+      const res=await fetch(`${API_URL}/employee/task/${taskId}`,{method:"DELETE"});
+      if(!res.ok) throw new Error("Delete failed");
+      setTasks(prev=>prev.filter(t=>t._id!==taskId)); toast.success("Task deleted!");
+    } catch(err){toast.error(err.message);}
+  },[]);
+
+  const exportCSV=useCallback(()=>{
+    if(!filteredTasks.length) return toast.error("No tasks to export");
+    const rows=filteredTasks.map(t=>{
+      const e=typeof t.employeeId==="object"?t.employeeId:{};
+      return [t._id,t.title,t.description,e.name,e.email,e.department,e.position,t.status,t.priority,t.type,`${t.progress||0}%`,fmtDate(t.dueDate),fmtDate(t.createdAt),fmtDate(t.lastUpdated),t.notes]
+        .map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(",");
+    });
+    const csv=["ID,Title,Description,Employee,Email,Dept,Position,Status,Priority,Type,Progress,Due,Created,Updated,Notes",...rows].join("\n");
+    const a=Object.assign(document.createElement("a"),{href:URL.createObjectURL(new Blob([csv],{type:"text/csv"})),download:`tasks-${new Date().toISOString().slice(0,10)}.csv`});
+    a.click(); URL.revokeObjectURL(a.href); toast.success("Exported!");
+  },[filteredTasks]);
+
+  const clearFilters=useCallback(()=>setFilters({search:"",employee:"",status:"",priority:"",type:"",dueDateFrom:"",dueDateTo:""}),[]);
+
+  const hasFilters=Object.values(filters).some(Boolean);
+  const isLoading =loadingPhase==="employees"||loadingPhase==="tasks";
+  const iCls      ="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 bg-gray-50 placeholder-gray-400";
+
+  return (
+    <>
+      <style>{`@keyframes fadeSlideIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}.row-enter{animation:fadeSlideIn .2s ease both}`}</style>
+      <Toaster position="top-right" toastOptions={{style:{fontSize:"13px"}}}/>
+
+      {selectedTask&&<Modal title="Task Details" onClose={()=>setSelectedTask(null)} wide><TaskDetailContent task={selectedTask}/></Modal>}
+      {showAddTask  &&<Modal title="Add New Task" onClose={()=>setShowAddTask(false)}><AddTaskForm task={newTask} setTask={setNewTask} employees={employees} onSubmit={handleAddTask} onCancel={()=>setShowAddTask(false)} iCls={iCls}/></Modal>}
+
+      <div className="min-h-screen bg-slate-50 p-5 md:p-8">
+        <div className="max-w-7xl mx-auto space-y-6">
+
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><FileText className="w-6 h-6 text-violet-600"/>Task Administration</h1>
+              <p className="text-sm text-gray-400 mt-0.5">
+                {loadingPhase==="employees"&&"Fetching employees…"}
+                {loadingPhase==="tasks"&&`Loading tasks — ${batchProgress.done}/${batchProgress.total} employees`}
+                {loadingPhase==="done"&&`${tasks.length} tasks · ${employees.length} employees`}
+              </p>
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              <button onClick={()=>setShowAddTask(true)} className="flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 text-white text-sm px-4 py-2 rounded-lg"><Plus className="w-4 h-4"/>Add Task</button>
+              <button onClick={fetchAll} disabled={isLoading} className="flex items-center gap-1.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 text-sm px-4 py-2 rounded-lg disabled:opacity-60"><RefreshCw className={`w-4 h-4 ${isLoading?"animate-spin":""}`}/>Refresh</button>
+              <button onClick={exportCSV} disabled={!filteredTasks.length} className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm px-4 py-2 rounded-lg disabled:opacity-50"><Download className="w-4 h-4"/>Export</button>
+            </div>
+          </div>
+
+          {/* Batch progress */}
+          {loadingPhase==="tasks"&&batchProgress.total>0&&(
+            <div className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm flex items-center gap-4">
+              <div className="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
+                <div className="bg-violet-500 h-2 rounded-full transition-all duration-300" style={{width:`${Math.round((batchProgress.done/batchProgress.total)*100)}%`}}/>
+              </div>
+              <span className="text-xs text-gray-500 shrink-0">{batchProgress.done}/{batchProgress.total}</span>
+            </div>
+          )}
+
+          {/* Error */}
+          {error&&(
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex justify-between items-start">
+              <div><p className="text-red-800 font-medium text-sm">Failed to load</p><p className="text-red-600 text-xs mt-0.5">{error}</p></div>
+              <button onClick={()=>setError(null)}><X className="w-4 h-4 text-red-400"/></button>
+            </div>
+          )}
+
+          {/* Stats */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+            {isLoading&&tasks.length===0?[...Array(7)].map((_,i)=><StatSkeleton key={i}/>):(
+              [{label:"Total",val:stats.total,color:"text-violet-600"},{label:"Completed",val:stats.completed,color:"text-emerald-600"},
+               {label:"In Progress",val:stats.inProgress,color:"text-blue-600"},{label:"Pending",val:stats.pending,color:"text-amber-600"},
+               {label:"On Hold",val:stats.onHold,color:"text-purple-600"},{label:"Urgent",val:stats.urgent,color:"text-red-600"},
+               {label:"High",val:stats.high,color:"text-orange-600"}]
+              .map(s=>(
+                <div key={s.label} className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
+                  <div className={`text-2xl font-bold ${s.color}`}>{s.val}</div>
+                  <div className="text-xs text-gray-500 mt-0.5">{s.label}</div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* ── FILTERS ────────────────────────────────────────────────────── */}
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sm font-semibold text-gray-700 flex items-center gap-1.5"><Filter className="w-4 h-4 text-gray-400"/>Filters</span>
+              {hasFilters&&<button onClick={clearFilters} className="text-xs text-violet-600 hover:text-violet-800 font-medium">Clear all</button>}
+            </div>
+
+            {/* Row 1: keyword + dropdowns */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-3">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-gray-400"/>
+                <input type="text" placeholder="Search…" value={filters.search} onChange={e=>setFilters(f=>({...f,search:e.target.value}))} className={`${iCls} pl-8`}/>
+              </div>
+              <select value={filters.employee} onChange={e=>setFilters(f=>({...f,employee:e.target.value}))} className={iCls}>
+                <option value="">All Employees</option>
+                {employees.map(e=><option key={e._id} value={e._id}>{e.name} · {e.department}</option>)}
+              </select>
+              <select value={filters.status} onChange={e=>setFilters(f=>({...f,status:e.target.value}))} className={iCls}>
+                <option value="">All Status</option>
+                {["pending","in progress","completed","on hold"].map(s=><option key={s} value={s}>{s[0].toUpperCase()+s.slice(1)}</option>)}
+              </select>
+              <select value={filters.priority} onChange={e=>setFilters(f=>({...f,priority:e.target.value}))} className={iCls}>
+                <option value="">All Priority</option>
+                {["low","medium","high","urgent"].map(p=><option key={p} value={p}>{p[0].toUpperCase()+p.slice(1)}</option>)}
+              </select>
+              <select value={filters.type} onChange={e=>setFilters(f=>({...f,type:e.target.value}))} className={iCls}>
+                <option value="">All Types</option>
+                {["Daily","Weekly","Monthly","Project"].map(t=><option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+
+            {/* Row 2: Due Date range */}
+            <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-gray-50">
+              <span className="text-xs font-medium text-gray-500 flex items-center gap-1">
+                <Calendar className="w-3.5 h-3.5 text-gray-400"/>Due Date Range
+              </span>
+              <div className="flex items-center gap-2">
+                {/* From */}
+                <div className="relative">
+                  <input type="date" value={filters.dueDateFrom}
+                    onChange={e=>setFilters(f=>({...f,dueDateFrom:e.target.value}))}
+                    className="px-3 pr-7 py-1.5 border border-gray-200 rounded-lg text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-violet-400 text-gray-700"/>
+                  {filters.dueDateFrom&&(
+                    <button onClick={()=>setFilters(f=>({...f,dueDateFrom:""}))} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                      <X className="w-3 h-3"/>
+                    </button>
+                  )}
+                </div>
+                <span className="text-xs text-gray-400 font-medium">—</span>
+                {/* To */}
+                <div className="relative">
+                  <input type="date" value={filters.dueDateTo} min={filters.dueDateFrom||undefined}
+                    onChange={e=>setFilters(f=>({...f,dueDateTo:e.target.value}))}
+                    className="px-3 pr-7 py-1.5 border border-gray-200 rounded-lg text-xs bg-gray-50 focus:outline-none focus:ring-2 focus:ring-violet-400 text-gray-700"/>
+                  {filters.dueDateTo&&(
+                    <button onClick={()=>setFilters(f=>({...f,dueDateTo:""}))} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                      <X className="w-3 h-3"/>
+                    </button>
+                  )}
+                </div>
+              </div>
+              {(filters.dueDateFrom||filters.dueDateTo)&&(
+                <span className="text-xs bg-violet-50 text-violet-600 border border-violet-200 px-2 py-0.5 rounded-full font-medium">
+                  {filteredTasks.length} task{filteredTasks.length!==1?"s":""} in range
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* ── TABLE ──────────────────────────────────────────────────────── */}
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[900px]">
+                <thead>
+                  <tr className="border-b border-gray-100 bg-gray-50 text-xs font-medium text-gray-500 uppercase tracking-wide">
+                    <th className="px-5 py-3 text-left">Task</th>
+                    <th className="px-5 py-3 text-left">Employee</th>
+                    <th className="px-5 py-3 text-left">Status / Priority</th>
+                    <th className="px-5 py-3 text-left">Progress</th>
+                    <th className="px-5 py-3 text-left">Dates</th>
+                    <th className="px-5 py-3 text-center">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {loadingPhase==="employees"||(loadingPhase==="tasks"&&tasks.length===0)
+                    ?[...Array(6)].map((_,i)=><RowSkeleton key={i}/>)
+                    :filteredTasks.length===0
+                    ?(
+                      <tr><td colSpan={6} className="py-16 text-center text-gray-400">
+                        <FileText className="w-10 h-10 mx-auto mb-3 opacity-30"/>
+                        <p className="font-medium text-sm">No tasks found</p>
+                        <p className="text-xs mt-1">{hasFilters?"Try adjusting your filters":loadingPhase==="tasks"?"Still loading…":"Create your first task"}</p>
+                      </td></tr>
+                    )
+                    :filteredTasks.map(task=>(
+                      <TaskRow key={task._id} task={task}
+                        activeDropdown={activeDropdown} setActiveDropdown={setActiveDropdown}
+                        onView={()=>setSelectedTask(task)}
+                        onComplete={()=>handleUpdateTask(task._id,{status:"completed",progress:100})}
+                        onDelete={()=>handleDeleteTask(task._id)}
+                      />
+                    ))
+                  }
+                </tbody>
+              </table>
+            </div>
+
+            {loadingPhase==="tasks"&&tasks.length>0&&(
+              <div className="border-t border-gray-100 px-5 py-2.5 bg-gray-50 flex items-center gap-3 text-xs text-gray-500">
+                <RefreshCw className="w-3 h-3 animate-spin text-violet-500 shrink-0"/>
+                Loading more… {batchProgress.done}/{batchProgress.total} employees · {tasks.length} tasks so far
+              </div>
+            )}
+            {loadingPhase==="done"&&filteredTasks.length>0&&(
+              <div className="border-t border-gray-100 px-5 py-2.5 bg-gray-50 text-xs text-gray-500">
+                Showing {filteredTasks.length} of {tasks.length} tasks
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </>
+  );
 };
 
 export default TaskAdmin;
