@@ -369,6 +369,7 @@ const AnalyticsDashboard = ({ analytics }) => (
   </div>
 );
 
+
 const CourseSelector = ({ courses, selectedCourse, onSelectCourse }) => (
   <div className="bg-white rounded-lg shadow p-4">
     <h3 className="font-semibold text-gray-700 mb-3 flex items-center">
