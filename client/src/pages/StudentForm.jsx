@@ -1,11 +1,10 @@
-
 import React, { useState } from "react";
 
 const StudentForm = () => {
   const [name, setName] = useState("");
   const [course, setCourse] = useState("");
   const [msg, setMsg] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false); // NEW
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -16,11 +15,10 @@ const StudentForm = () => {
       return;
     }
 
-    if (isSubmitting) return; // PREVENT DOUBLE CLICK
-    setIsSubmitting(true); // DISABLE BUTTON
+    if (isSubmitting) return; 
+    setIsSubmitting(true); 
 
     const WEB_APP_URL = "https://script.google.com/macros/s/AKfycby9PJdPKH3VCi0qCo8fHSyc69vklIyiq-VpY_M084e3EMkhFwQkdnSF9eIc6PUQgyKs/exec";
-    // const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyJIf0XyOxDkJV8loq5MNae7unSc9xwRfEDJ5kWZmt-GTUgfCdEEWVCxsiMpCt59hv4/exec";
 
     const body = new URLSearchParams();
     body.append("name", name.trim());
@@ -33,12 +31,12 @@ const StudentForm = () => {
 
       if (text === "SUCCESS") {
         setName("");
-        setCourse("");
+        setCourse(""); // Resets dropdown back to "Select Course"
       }
     } catch {
       setMsg("No internet");
     } finally {
-      setIsSubmitting(false); // RE-ENABLE AFTER DONE
+      setIsSubmitting(false); 
     }
 
     setTimeout(() => setMsg(""), 4000);
@@ -60,20 +58,27 @@ const StudentForm = () => {
             placeholder="Full Name"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-purple-500"
+            className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:outline-none"
             required
           />
-          <input
-            type="text"
-            placeholder="Course"
+          
+          {/* Replaced Input with Select Dropdown */}
+          <select
             value={course}
             onChange={(e) => setCourse(e.target.value)}
-            className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-purple-500"
+            className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:outline-none bg-white"
             required
-          />
+          >
+            <option value="" disabled>Select Course</option>
+            <option value="ServiceNow">ServiceNow</option>
+            <option value="Databricks">Databricks</option>
+            <option value="Full Stack">Full Stack</option>
+            <option value="Data Analyst">Data Analyst</option>
+          </select>
+
           <button
             type="submit"
-            disabled={isSubmitting} // DISABLE WHEN SUBMITTING
+            disabled={isSubmitting}
             className={`w-full py-3 rounded-lg font-bold transition ${
               isSubmitting
                 ? "bg-gray-400 text-gray-700 cursor-not-allowed"
