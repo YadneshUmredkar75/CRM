@@ -56,9 +56,9 @@ app.use(express.json());
 // ------------- FULL CORS FIX ----------------
 const allowedOrigins = [
   "https://crm-8wka.onrender.com",
-  "http://localhost:8080",
+  "https://crm-server-jl9z.onrender.com",
   "http://localhost:5173",
-  "http://localhost:8080"
+  "https://crm-server-jl9z.onrender.com"
 ];
 
 app.use((req, res, next) => {

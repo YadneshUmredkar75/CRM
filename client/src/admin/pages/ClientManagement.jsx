@@ -63,7 +63,7 @@ const ClientManagement = () => {
     );
   }
 
-  const API_BASE = "http://localhost:8080/api/clients";
+  const API_BASE = "https://crm-server-jl9z.onrender.com/api/clients";
 
   const [clients, setClients] = useState([]);
   const [stats, setStats] = useState({ total: 0, active: 0, vip: 0, totalValue: 0, totalProjects: 0, avgProjects: 0 });

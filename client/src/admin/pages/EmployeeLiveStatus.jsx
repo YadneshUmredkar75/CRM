@@ -3,7 +3,7 @@ import React, {
 } from "react";
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
-const API_URL      = "http://localhost:8080/api";
+const API_URL      = "https://crm-server-jl9z.onrender.com/api";
 const STATUS_BATCH = 5;
 
 const DEPARTMENTS = [

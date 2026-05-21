@@ -42,7 +42,7 @@ const EmployeeLogin = () => {
     }
 
     try {
-      const res = await fetch("http://localhost:8080/api/employee/login", {
+      const res = await fetch("https://crm-server-jl9z.onrender.com/api/employee/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ identifier, password }),

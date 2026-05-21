@@ -104,7 +104,7 @@ const DEPARTMENTS = [
   { id: 6, name: "Operations" },
 ];
 
-const API_URL = "http://localhost:8080/api";
+const API_URL = "https://crm-server-jl9z.onrender.com/api";
 const BATCH_SIZE = 4;
 
 const EMPTY_NEW_EMP = {
