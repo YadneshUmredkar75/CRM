@@ -55,6 +55,7 @@ app.use(express.json());
 
 // ------------- FULL CORS FIX ----------------
 const allowedOrigins = [
+  "https://crm-8wka.onrender.com",
   "http://localhost:8080",
   "http://localhost:5173",
   "http://localhost:8080"
@@ -99,7 +100,7 @@ if (process.env.NODE_ENV === "production") {
   app.use(express.static(frontendPath));
 
   // Wildcard route - send frontend for unknown paths
-  app.get("*", (req, res) => {
+  app.get("/*", (req, res) => {
     res.sendFile(path.join(frontendPath, "index.html"));
   });
 }
