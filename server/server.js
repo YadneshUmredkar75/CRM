@@ -60,7 +60,7 @@ const allowedOrigins = [
   "http://localhost:5173",
   "https://crm-server-jl9z.onrender.com"
 ];
-
+app.use(express.static(path.join(__dirname, '../client/dist')))
 app.use((req, res, next) => {
   const origin = req.headers.origin;
 
@@ -100,9 +100,9 @@ if (process.env.NODE_ENV === "production") {
   app.use(express.static(frontendPath));
 
   // Wildcard route - send frontend for unknown paths
-  app.get("/*", (req, res) => {
-    res.sendFile(path.join(frontendPath, "index.html"));
-  });
+  app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../client/dist/index.html'))
+})
 }
 // ----------------------------------------------------------------
 
