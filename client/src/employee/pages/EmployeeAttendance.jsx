@@ -60,7 +60,7 @@ const EmployeeAttendance = () => {
     setLoading(true);
     try {
       const res = await fetch(
-        "https://crm-backend-v2.onrender.com/api/attendance/history",
+        "http://localhost:8080/api/attendance/history",
         { headers: { Authorization: `Bearer ${token}` } }
       );
       const result = await res.json();
@@ -125,7 +125,7 @@ const EmployeeAttendance = () => {
       const { latitude, longitude } = position.coords;
 
       const res = await fetch(
-        "https://crm-backend-v2.onrender.com/api/attendance/clock-in",
+        "http://localhost:8080/api/attendance/clock-in",
         {
           method: "POST",
           headers: {
@@ -152,7 +152,7 @@ const EmployeeAttendance = () => {
     setClocking("out");
     try {
       const res = await fetch(
-        "https://crm-backend-v2.onrender.com/api/attendance/clock-out",
+        "http://localhost:8080/api/attendance/clock-out",
         {
           method: "POST",
           headers: {

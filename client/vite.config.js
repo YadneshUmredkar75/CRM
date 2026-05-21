@@ -9,7 +9,7 @@ export default defineConfig({
   server: {
     proxy: {
       "/api": {
-        target: "https://crm-backend-v2.onrender.com", // your backend
+        target: "http://localhost:8080", // your backend
         changeOrigin: true,
         secure: false,
       },

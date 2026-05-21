@@ -78,8 +78,8 @@ const AdminEventGuestManager = () => {
     }
 
     // API Base URLs
-    const API_BASE_EVENTS = "http://localhost:5000/api/events";
-    const API_BASE_GUESTS = "http://localhost:5000/api/guests";
+    const API_BASE_EVENTS = "http://localhost:8080/api/events";
+    const API_BASE_GUESTS = "http://localhost:8080/api/guests";
 
     // State for Events
     const [events, setEvents] = useState([]);

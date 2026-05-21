@@ -55,9 +55,9 @@ app.use(express.json());
 
 // ------------- FULL CORS FIX ----------------
 const allowedOrigins = [
-  "https://ssinfotech-crm.netlify.app", 
-  "https://sscrm.ssinfotech.co",
-  "https://crm-backend-v2.onrender.com"
+  "http://localhost:8080",
+  "http://localhost:5173",
+  "http://localhost:8080"
 ];
 
 app.use((req, res, next) => {
